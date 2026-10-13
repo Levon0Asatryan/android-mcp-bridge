@@ -40,7 +40,7 @@ Health Connect records from a private ChatGPT conversation.
   refused while locked, native biometric/PIN approval for deletes, screenshot
   protection. Writes were later changed to run without a phone prompt (owner
   decision); **deletes still always need biometric approval**.
-- Renamed to *Health Bridge*; application ID `dev.healthbridge` kept so the
+- Renamed to *Health Bridge*; application ID `dev.androidmcp.bridge` kept so the
   install, data and Health Connect grants survived.
 
 ## 3. Removing local mode
@@ -221,6 +221,8 @@ the new scopes are requested and approved on the phone.
 - **New scopes:** `oxygen.read|write`, `vitals.read`, `activity.read`, `mindfulness.read|write`.
 - **Modules:** MCP tools are now `health_<tool>`; core tools are `bridge_status`, `bridge_permissions`, `bridge_connection_check`. See `docs/mcp-bridge-plan.md`.
 - Not added: blood pressure, glucose, temperature, cycle tracking (no devices or not wanted); stress and waist are not in Health Connect.
+
+- **Rename:** app "Android MCP Bridge", package `dev.androidmcp.bridge`, worker and repo `android-mcp-bridge`, token prefix `amb.`, MCP server name `android-mcp`. Scopes are `health.*`; Android has a `BridgeModule` interface (`HealthActions` is the `health` module). New adaptive launcher icon (bridge arch with a node). New install, so pair again; new worker has new secrets (kept in gitignored `backend/.secrets.local`).
 
 **After updating:** redeploy, reinstall, grant the new Health Connect permissions, tap Start in the gateway panel, then delete and re-create the ChatGPT connector (new tool names and scopes).
 

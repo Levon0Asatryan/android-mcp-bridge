@@ -106,7 +106,7 @@ custom MCP calls work there; verify on the web first. The legacy Actions adapter
   native Health Connect client record ID is derived from it, so retries are safe.
   If the outcome is unknown (timeout, disconnect, native failure) the API says
   `outcome_unknown`; retry with the same key and arguments.
-- **Deletions** of HealthBridge-owned records need biometric/PIN on the phone
+- **Deletions** of Android MCP Bridge-owned records need biometric/PIN on the phone
   within 20 seconds (and before the request deadline). Only one may wait.
   Disconnect, cancel, lock, power saver or deadline withdraws a pending prompt.
   If deletion already started, cancellation cannot promise rollback; a lost

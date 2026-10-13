@@ -60,7 +60,7 @@ describe("protocol policy", () => {
     expect(statusFor("phone_locked")).toBe(403);
     expect(statusFor("outcome_unknown")).toBe(504);
     expect(statusFor("anything-else")).toBe(502);
-    expect(TOKEN_PATTERN.test(`hb.${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}.${"A".repeat(43)}`)).toBe(true);
+    expect(TOKEN_PATTERN.test(`amb.${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}.${"A".repeat(43)}`)).toBe(true);
   });
 
   it("accepts only canonical HTTPS or loopback origins", () => {

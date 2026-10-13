@@ -53,19 +53,19 @@ const TOOLS: Record<string, ToolSpec> = {
     description: "Add one meal to Health Connect. Besides calories and macros it accepts optional detail: sugar, fiber, sodium, fat types, cholesterol, minerals, vitamins and caffeine (units are in the field names). Retrying with the same idempotency_key does not create a duplicate.",
     input: nutritionEntry },
   delete_nutrition: { operation: "delete_nutrition", title: "Delete nutrition", readOnly: false, destructive: true, idempotent: false, input: recordId,
-    description: "Delete one nutrition record written by Health Bridge. The owner must confirm on the phone." },
+    description: "Delete one nutrition record written by Android MCP Bridge. The owner must confirm on the phone." },
   get_weight: { operation: "get_weight", title: "Read weight", readOnly: true, destructive: false, idempotent: true, input: range,
     description: "Read body weight records between start_time and end_time (at most 366 days)." },
   add_weight: { operation: "add_weight", title: "Add weight", readOnly: false, destructive: false, idempotent: true,
     description: "Add one body weight entry in kilograms. Retrying with the same idempotency_key does not create a duplicate.",
     input: z.object({ weight_kg: z.number().finite().gt(0).max(1000), timestamp: isoTime, idempotency_key: idempotency }).strict() },
   delete_weight: { operation: "delete_weight", title: "Delete weight", readOnly: false, destructive: true, idempotent: false, input: recordId,
-    description: "Delete one weight record written by Health Bridge. The owner must confirm on the phone." },
+    description: "Delete one weight record written by Android MCP Bridge. The owner must confirm on the phone." },
   get_steps: { operation: "get_steps", title: "Read steps", readOnly: true, destructive: false, idempotent: true, input: range,
     description: "Read the step total between start_time and end_time (at most 366 days)." },
   update_nutrition: { operation: "update_nutrition", title: "Update nutrition", readOnly: false, destructive: false, idempotent: true,
-    description: "Correct a meal previously added by Health Bridge, in place and without creating a duplicate. Send only the fields to change, e.g. {\"calories_kcal\": 410}. Records created by other apps (such as Samsung Health) cannot be changed.",
-    input: z.object({ record_id: z.string().min(1).max(200).describe("Exact id of a Health Bridge nutrition record."), changes: nutritionChanges }).strict() },
+    description: "Correct a meal previously added by Android MCP Bridge, in place and without creating a duplicate. Send only the fields to change, e.g. {\"calories_kcal\": 410}. Records created by other apps (such as Samsung Health) cannot be changed.",
+    input: z.object({ record_id: z.string().min(1).max(200).describe("Exact id of a Android MCP Bridge nutrition record."), changes: nutritionChanges }).strict() },
   add_nutrition_batch: { operation: "add_nutrition_batch", title: "Add nutrition batch", readOnly: false, destructive: false, idempotent: true,
     description: `Save up to ${MAX_BATCH} meals at once. Each entry needs its own idempotency_key; retrying the same entry never duplicates it. Returns one result per entry, in order, so a failure in one meal does not block the others.`,
     input: z.object({ entries: z.array(nutritionEntry).min(1).max(MAX_BATCH) }).strict() },
@@ -120,20 +120,20 @@ const TOOLS: Record<string, ToolSpec> = {
     description: "One-call summary of a calendar day in the phone's time zone: nutrition (totals per source), hydration, steps, workouts, sleep, weight, body measurements, active calories and heart rate. Sections the connection may not read are reported as not_permitted. Today is summarised up to now.",
     input: z.object({ date: z.string().length(10).describe("Calendar date, YYYY-MM-DD, in the phone's time zone.") }).strict() },
   get_data_freshness: { operation: "get_data_freshness", title: "Data freshness", readOnly: true, destructive: false, idempotent: true, input: empty,
-    description: "Per data type, which apps wrote data in the last 30 days and when each last wrote or synced (e.g. Samsung Health vs Health Bridge). Use it to tell missing data from data that has not synced yet." },
+    description: "Per data type, which apps wrote data in the last 30 days and when each last wrote or synced (e.g. Samsung Health vs Android MCP Bridge). Use it to tell missing data from data that has not synced yet." },
 };
 
 const toolName = (key: string, spec: ToolSpec) => (spec.module ?? "health") === "core" ? key : `health_${key}`;
 
 function server(env: Env, origin: string, auth: McpAuth | null): McpServer {
-  const mcp = new McpServer({ name: "health-bridge", version: "1.0.0" }, { capabilities: { tools: {} } });
+  const mcp = new McpServer({ name: "android-mcp", version: "1.0.0" }, { capabilities: { tools: {} } });
   mcp.registerTool("bridge_connection_check", {
     title: "Connection check",
     description: "Confirms this MCP endpoint answers. Returns no account, phone, pairing or health information.",
     inputSchema: empty, outputSchema: z.object({ ok: z.literal(true), protocol: z.literal("mcp") }).strict(),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _meta: { securitySchemes: [{ type: "noauth" }, { type: "oauth2", scopes: [] }] },
-  }, async () => ({ content: [{ type: "text", text: "Health Bridge MCP endpoint is reachable." }], structuredContent: { ok: true, protocol: "mcp" } }));
+  }, async () => ({ content: [{ type: "text", text: "Android MCP Bridge MCP endpoint is reachable." }], structuredContent: { ok: true, protocol: "mcp" } }));
 
   for (const [key, spec] of Object.entries(TOOLS)) {
     const name = toolName(key, spec);

@@ -1,16 +1,16 @@
 # Android MCP Bridge: generalization plan
 
-Status: **plan only**. Only the module grouping of MCP tool names is implemented.
+Status: **phases 1-3 done**. Scope prefixes (`health.*`), the `BridgeModule` interface, the rename and the new logo are implemented. Module-prefixed wire operations and per-module backend files remain for later.
 
-## Names
+## Names (all applied)
 
 | Thing | Now | Target |
 | --- | --- | --- |
-| Android app | Health Bridge | **Android MCP Bridge** |
+| Android app | Health Bridge | **Android MCP Bridge** (done) |
 | ChatGPT connector / MCP server name | Health Bridge | **Android MCP** |
 | Repository | `health-bridge` | `android-mcp-bridge` |
 | Worker | `health-bridge` | `android-mcp-bridge` |
-| Package id | `dev.healthbridge` | `dev.androidmcp.bridge` |
+| Package id | `dev.androidmcp.bridge` | `dev.androidmcp.bridge` |
 | Token prefix | `hb.` | `amb.` |
 
 ## Modules

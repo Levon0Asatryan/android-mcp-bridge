@@ -47,12 +47,13 @@
         <intent><action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" /></intent>
     </queries>
     <application
-        android:name=".HealthBridgeApplication"
+        android:name=".BridgeApplication"
         android:allowBackup="false"
-        android:label="Samsung ChatGPT Health Bridge"
-        android:icon="@drawable/ic_bridge"
+        android:label="Android MCP Bridge"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.HealthBridge">
+        android:theme="@style/Theme.AndroidMcpBridge">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

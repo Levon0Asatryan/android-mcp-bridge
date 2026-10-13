@@ -608,7 +608,7 @@ export class BridgeObject extends DurableObject<Env> {
     if (!client) {
       this.allow("auth_fail", LIMITS.authFailuresPerMinute, true);
       this.event("auth_failures", "client");
-      return fail("unauthorized", "Missing, invalid, expired or revoked client credential.", { "www-authenticate": 'Bearer realm="HealthBridge"' });
+      return fail("unauthorized", "Missing, invalid, expired or revoked client credential.", { "www-authenticate": 'Bearer realm="AndroidMcpBridge"' });
     }
     if (!this.allow(`client:${client.client_id}`, LIMITS.clientCallsPerMinute, true)) return fail("rate_limited", "Too many requests for this client.");
     let args = route.arguments;

@@ -9,7 +9,7 @@ adb get-state >/dev/null
 adb forward "tcp:$port" "tcp:$port"
 status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$port/v1/status")"
 if [ "$status" != "401" ]; then
-  echo "Start the HealthBridge gateway. Its unauthenticated status endpoint must reject access with HTTP 401." >&2
+  echo "Start the Android MCP Bridge gateway. Its unauthenticated status endpoint must reject access with HTTP 401." >&2
   exit 1
 fi
 printf '%s\n' \

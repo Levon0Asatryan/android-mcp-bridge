@@ -1,6 +1,6 @@
-# Health Bridge 🌉
+# Android MCP Bridge 🌉
 
-Health Bridge is a personal, privacy-first bridge connecting conversational AI assistants (such as ChatGPT Custom Actions and Model Context Protocol / MCP clients) directly to your Android health data stored in [AndroidX Health Connect](https://developer.android.com/health-and-fitness/guides/health-connect).
+Android MCP Bridge is a personal, privacy-first bridge connecting conversational AI assistants (such as ChatGPT Custom Actions and Model Context Protocol / MCP clients) directly to your Android health data stored in [AndroidX Health Connect](https://developer.android.com/health-and-fitness/guides/health-connect).
 
 It enables private AI interactions—such as logging meals, reviewing nutrition history, tracking weight, or analyzing step counts—without exposing personal health records to centralized third-party servers or cloud databases.
 
@@ -50,7 +50,7 @@ It enables private AI interactions—such as logging meals, reviewing nutrition 
                                                       ┌──────────────────────────────────┐
                                                       │                                  │
                                                       │   Android Phone                  │
-                                                      │   (Health Bridge App)            │
+                                                      │   (Android MCP Bridge App)            │
                                                       │                                  │
                                                       │   ┌──────────────────────────┐   │
                                                       │   │ Android Keystore (P-256) │   │

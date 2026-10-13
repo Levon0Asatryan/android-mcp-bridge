@@ -74,7 +74,7 @@ export async function handleAuthorize(request: Request, env: Env, origin: string
     const auth = await validate(request, env, origin);
     if (auth instanceof Response) return auth;
     const { handle, headers } = await authorizationServer(origin).getOAuthApi(env).beginConsent(auth);
-    return page("Connect Health Bridge", `<p>An app is asking to connect to your Health Bridge. Approval happens only on your paired phone,
+    return page("Connect Android MCP Bridge", `<p>An app is asking to connect to your Android MCP Bridge. Approval happens only on your paired phone,
 with screen lock confirmation. Keep this page open.</p><form method="post" action="/authorize/link"><input type="hidden" name="handle" value="${escapeHtml(handle)}">
 <button type="submit">Send approval request to my phone</button></form>
 <form method="post" action="/authorize/deny"><input type="hidden" name="handle" value="${escapeHtml(handle)}"><button type="submit">Cancel</button></form>`, { headers });
@@ -94,7 +94,7 @@ with screen lock confirmation. Keep this page open.</p><form method="post" actio
       }
       const preflight = await stub(env).linkPreflight();
       if (preflight !== "ok") {
-        const message = preflight === "offline" ? "Your phone bridge is not connected. Open Health Bridge on the phone, then reload this page."
+        const message = preflight === "offline" ? "Your phone bridge is not connected. Open Android MCP Bridge on the phone, then reload this page."
           : preflight === "busy" ? "Another approval request is already waiting. Finish or let it expire, then reload this page." : "Too many approval requests. Try again later.";
         return page("Cannot send request", `<p>${message}</p>`, { status: preflight === "offline" ? 503 : 429 });
       }
@@ -119,7 +119,7 @@ with screen lock confirmation. Keep this page open.</p><form method="post" actio
     if (view.state === "redirect") return redirect(view.to, clear);
     if (view.state === "closed") return redirect(authorizationErrorRedirect(view.request, "access_denied", "Not approved on the phone."), clear);
     if (view.state === "unknown") return page("Request expired", "<p>Start the connection again from the app.</p>", { status: 400, headers: clear });
-    return page("Approve on your phone", `<p>Open Health Bridge on your paired phone and confirm the request showing this code:</p>
+    return page("Approve on your phone", `<p>Open Android MCP Bridge on your paired phone and confirm the request showing this code:</p>
 <p><code>${view.code}</code></p><p>This page refreshes automatically. The request expires in two minutes.</p>`, { refresh: 3 });
   }
   return page("Not found", "", { status: 404 });

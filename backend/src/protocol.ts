@@ -63,7 +63,7 @@ export function withinOutputBudget(serialized: string): boolean {
   return serialized.length <= LIMITS.outputChars && new TextEncoder().encode(serialized).byteLength <= LIMITS.outputBytes;
 }
 
-export const TOKEN_PATTERN = /^hb\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/;
+export const TOKEN_PATTERN = /^amb\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
 const MEAL_TYPES = new Set(["breakfast", "lunch", "dinner", "snack", "unknown"]);
 export const EXERCISE_TYPES = [

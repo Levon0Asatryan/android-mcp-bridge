@@ -54,7 +54,7 @@ async function pkce() {
 function authorizeUrl(params: Record<string, string>): string {
   const url = new URL(`${ORIGIN}/authorize`);
   for (const [k, v] of Object.entries({ response_type: "code", client_id: CLIENT_ID, redirect_uri: REDIRECT, state: "state-1",
-    code_challenge_method: "S256", resource: RESOURCE, scope: "bridge.status nutrition.read nutrition.delete", ...params })) {
+    code_challenge_method: "S256", resource: RESOURCE, scope: "bridge.status health.nutrition.read health.nutrition.delete", ...params })) {
     if (v !== "") url.searchParams.set(k, v);
   }
   return url.href;
@@ -94,13 +94,13 @@ async function token(body: Record<string, string>) {
 }
 
 /** Full approved link; returns tokens and the phone-held grant secret. */
-async function linked(scopes = ["bridge.status", "nutrition.read", "nutrition.delete"]) {
+async function linked(scopes = ["bridge.status", "health.nutrition.read", "health.nutrition.delete"]) {
   const phone = await pairedPhone();
   const { verifier, challenge } = await pkce();
   const { link } = await startLink(challenge);
   expect(link.status).toBe(303);
   const request = await phone.next("link_request");
-  expect(request).toMatchObject({ oauth_client_id: CLIENT_ID, redirect_host: "chatgpt.example.test", scopes: ["bridge.status", "nutrition.read", "nutrition.delete"] });
+  expect(request).toMatchObject({ oauth_client_id: CLIENT_ID, redirect_host: "chatgpt.example.test", scopes: ["bridge.status", "health.nutrition.read", "health.nutrition.delete"] });
   const grant = await approve(phone, request, scopes);
   expect(grant.ack).toMatchObject({ ok: true });
   const wait = await fetchWorker(`${ORIGIN}${link.headers.get("location")}`, { redirect: "manual", headers: { cookie: cookies(link) } });
@@ -153,7 +153,7 @@ describe("MCP endpoint", () => {
     const init = await fetchWorker(RESOURCE, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "x", version: "1" } } }) });
     expect(init.status).toBe(200);
-    expect(await init.text()).toContain("health-bridge");
+    expect(await init.text()).toContain("android-mcp");
     const crossOrigin = await fetchWorker(RESOURCE, { method: "POST", headers: { origin: "https://evil.example",
       "content-type": "application/json" }, body: "{}" });
     expect(crossOrigin.status).toBe(403);
@@ -212,9 +212,9 @@ describe("OAuth authorization", () => {
     const phone = await pairedPhone();
     const { link } = await startLink(challenge);
     const request = await phone.next("link_request");
-    expect((await approve(phone, request, ["nutrition.read"], { binding: "0".repeat(64) })).ack).toMatchObject({ ok: false, error: "binding_mismatch" });
-    expect((await approve(phone, request, ["weight.write"])).ack).toMatchObject({ ok: false });
-    expect((await approve(phone, request, ["nutrition.read"], { pairing_generation: 9 })).ack).toMatchObject({ ok: false });
+    expect((await approve(phone, request, ["health.nutrition.read"], { binding: "0".repeat(64) })).ack).toMatchObject({ ok: false, error: "binding_mismatch" });
+    expect((await approve(phone, request, ["health.weight.write"])).ack).toMatchObject({ ok: false });
+    expect((await approve(phone, request, ["health.nutrition.read"], { pairing_generation: 9 })).ack).toMatchObject({ ok: false });
     phone.send({ type: "link_result", version: 1, link_id: request.link_id, binding: request.binding, approved: false });
     expect(await phone.next("link_ack")).toMatchObject({ ok: true });
     const wait = await fetchWorker(`${ORIGIN}${link.headers.get("location")}`, { redirect: "manual", headers: { cookie: cookies(link) } });
@@ -229,7 +229,7 @@ describe("OAuth authorization", () => {
   it("issues tokens only for the right verifier, once, and rotates refresh tokens", async () => {
     const { tokens, phone, secret } = await linked();
     expect(tokens.expires_in).toBeLessThanOrEqual(900);
-    expect(tokens.scope.split(" ").sort()).toEqual(["bridge.status", "nutrition.delete", "nutrition.read"]);
+    expect(tokens.scope.split(" ").sort()).toEqual(["bridge.status", "health.nutrition.delete", "health.nutrition.read"]);
     const refreshed = await token({ grant_type: "refresh_token", refresh_token: tokens.refresh_token });
     expect(refreshed.status).toBe(200);
     const next = await refreshed.json<{ refresh_token: string; access_token: string }>();
@@ -267,7 +267,7 @@ describe("OAuth authorization", () => {
     const phone = await pairedPhone();
     const { challenge } = await pkce();
     const { link } = await startLink(challenge);
-    await approve(phone, await phone.next("link_request"), ["nutrition.read"]);
+    await approve(phone, await phone.next("link_request"), ["health.nutrition.read"]);
     const wait = await fetchWorker(`${ORIGIN}${link.headers.get("location")}`, { redirect: "manual", headers: { cookie: cookies(link) } });
     const code = new URL(wait.headers.get("location") as string).searchParams.get("code") as string;
     const wrong = await token({ grant_type: "authorization_code", code, redirect_uri: REDIRECT, code_verifier: (await pkce()).verifier, resource: RESOURCE });
@@ -277,7 +277,7 @@ describe("OAuth authorization", () => {
 
 describe("OAuth health tools", () => {
   it("relays scoped calls with the phone-held grant and an auth envelope, and enforces scopes", async () => {
-    const { tokens, phone, secret, clientId } = await linked(["bridge.status", "nutrition.read"]);
+    const { tokens, phone, secret, clientId } = await linked(["bridge.status", "health.nutrition.read"]);
     const client = await mcpClient(tokens.access_token);
     const pending = client.callTool({ name: "health_get_nutrition", arguments: { start_time: "2030-01-01T00:00:00Z", end_time: "2030-01-02T00:00:00Z" } });
     const command = await phone.next("command");

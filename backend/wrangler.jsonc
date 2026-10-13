@@ -1,7 +1,7 @@
 // Generic configuration only. Set the real origin and secrets privately; see ../docs/standalone-setup.md.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "health-bridge",
+  "name": "android-mcp-bridge",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
@@ -13,7 +13,7 @@
   "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "678dfd5fed084cb0a70448c48a700efc" }],
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BridgeObject"] }],
   "vars": {
-    "PUBLIC_ORIGIN": "https://health-bridge.example.invalid",
+    "PUBLIC_ORIGIN": "https://android-mcp-bridge.example.invalid",
     "PAIRING_RESET_EPOCH": "0"
   }
 }

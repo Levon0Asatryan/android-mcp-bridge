@@ -6,10 +6,10 @@ plugins {
     id("com.google.devtools.ksp")
 }
 android {
-    namespace = "dev.healthbridge"
+    namespace = "dev.androidmcp.bridge"
     compileSdk = 36
     defaultConfig {
-        applicationId = "dev.healthbridge"
+        applicationId = "dev.androidmcp.bridge"
         minSdk = 28
         targetSdk = 35
         versionCode = 1

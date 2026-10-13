@@ -28,7 +28,7 @@ export function claims(purpose: string, aud: string, nonce: string, extra: objec
 }
 
 export function clientToken(): string {
-  return `hb.${crypto.randomUUID()}.${b64u(crypto.getRandomValues(new Uint8Array(32)))}`;
+  return `amb.${crypto.randomUUID()}.${b64u(crypto.getRandomValues(new Uint8Array(32)))}`;
 }
 
 export async function sha256Hex(value: string): Promise<string> {

@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Samsung ChatGPT Health Bridge
+  title: Android MCP Bridge
   version: 1.0.0
   description: Authenticated access to your Android Health Connect data through your private single-owner instance. Errors use error_category; a 504 outcome_unknown write must be retried with the same idempotency_key. Samsung Health visibility is not automatically verified.
 servers:
@@ -46,7 +46,7 @@ paths:
   /v1/nutrition/{record_id}:
     delete:
       operationId: deleteNutrition
-      summary: Delete only a HealthBridge-owned nutrition record; open HealthBridge and confirm within 20 seconds
+      summary: Delete only a Android MCP Bridge-owned nutrition record; open Android MCP Bridge and confirm within 20 seconds
       x-openai-isConsequential: true
       parameters:
         - {$ref: "#/components/parameters/RecordId"}
@@ -76,7 +76,7 @@ paths:
   /v1/weight/{record_id}:
     delete:
       operationId: deleteWeight
-      summary: Delete only a HealthBridge-owned weight measurement; confirm on the phone within 20 seconds
+      summary: Delete only a Android MCP Bridge-owned weight measurement; confirm on the phone within 20 seconds
       x-openai-isConsequential: true
       parameters:
         - {$ref: "#/components/parameters/RecordId"}
@@ -94,11 +94,11 @@ paths:
         "200": {description: Aggregated steps, content: {application/json: {schema: {$ref: "#/components/schemas/Result"}}}}
 components:
   securitySchemes:
-    clientToken: {type: http, scheme: bearer, bearerFormat: HealthBridge client token}
+    clientToken: {type: http, scheme: bearer, bearerFormat: Android MCP Bridge client token}
   parameters:
     Start: {name: start_time, in: query, required: true, schema: {type: string, format: date-time}, description: Inclusive timestamp with UTC offset; read-history restrictions apply.}
     End: {name: end_time, in: query, required: true, schema: {type: string, format: date-time}, description: Exclusive timestamp with UTC offset; query at most 366 days.}
-    RecordId: {name: record_id, in: path, required: true, schema: {type: string, maxLength: 200}, description: Exact record identifier returned by HealthBridge.}
+    RecordId: {name: record_id, in: path, required: true, schema: {type: string, maxLength: 200}, description: Exact record identifier returned by Android MCP Bridge.}
   schemas:
     Result:
       type: object

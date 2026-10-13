@@ -196,7 +196,7 @@ describe("health ingress", () => {
     const { stub, phone, token } = await ready();
     expect((await api(stub, null, "/v1/status")).status).toBe(401);
     expect((await api(stub, clientToken(), "/v1/status")).status).toBe(401);
-    expect((await api(stub, "hb.not-a-token", "/v1/status")).status).toBe(401);
+    expect((await api(stub, "amb.not-a-token", "/v1/status")).status).toBe(401);
     expect((await api(stub, BOOTSTRAP, "/v1/status")).status).toBe(401);
     const expired = clientToken();
     await register(phone, [{ token }, { token: expired, expires: Date.now() - 1 }]);

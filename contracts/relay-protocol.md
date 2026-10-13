@@ -1,6 +1,6 @@
 # Relay protocol v1 (as implemented)
 
-Contract between the Android app (`app/src/main/java/dev/healthbridge/relay/`) and
+Contract between the Android app (`app/src/main/java/dev/androidmcp/bridge/relay/`) and
 the private instance (`backend/src/`). Protocol version is `1` everywhere.
 Health arguments and command envelopes use exact key sets; unknown fields are
 rejected. Control messages are validated for their required fields and types.
@@ -138,7 +138,7 @@ only `initialize`, `tools/list` and `bridge_connection_check` (returns
 `{ok, protocol}`) work; health tools return an auth error with a
 `WWW-Authenticate` challenge. A present but invalid bearer gets `401`. Access
 tokens must have this instance's `/mcp` resource as audience, the predefined
-client ID and the tool's scope. Scopes: `bridge.status`, `nutrition.read|write|delete`,
+client ID and the tool's scope. Scopes: `bridge.status`, `health.nutrition.read|write|delete`,
 `weight.read|write|delete`, `steps.read`, `hydration.read|write`, `sleep.read|write`,
 `workouts.read|write`, `heart_rate.read`, `active_calories.read`, `body.read|write`,
 `summary.read`. Health calls then follow the same

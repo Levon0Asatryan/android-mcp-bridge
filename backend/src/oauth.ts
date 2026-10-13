@@ -72,7 +72,7 @@ export async function ensureClient(env: Env, origin: string, config: OAuthConfig
 export function protectedResourceMetadata(origin: string): Record<string, unknown> {
   return {
     resource: mcpResource(origin), authorization_servers: [origin], scopes_supported: [...SCOPES],
-    bearer_methods_supported: ["header"], resource_name: "Health Bridge",
+    bearer_methods_supported: ["header"], resource_name: "Android MCP Bridge",
   };
 }
 
