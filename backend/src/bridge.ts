@@ -348,6 +348,7 @@ export class BridgeObject extends DurableObject<Env> {
         in_flight: LIMITS.inFlight, delete_approval_ms: LIMITS.deleteApprovalMs },
     }));
     this.event("device_connected", displaced ? "replaced_previous" : null);
+    await this.resendPendingLinks(server);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -419,6 +420,22 @@ export class BridgeObject extends DurableObject<Env> {
   }
 
   // ---- OAuth linking ---------------------------------------------------------------------------
+  /** A reconnect drops the phone's prompt; replay unexpired pending requests so they are not stuck until expiry. */
+  private async resendPendingLinks(socket: WebSocket): Promise<void> {
+    const rows = this.sql.exec<{ id: string; code: string; expires_at: number; auth_request: string }>(
+      "SELECT id, code, expires_at, auth_request FROM links WHERE status = 'pending' AND expires_at > ?", Date.now() + 5_000).toArray();
+    for (const row of rows) {
+      const request = JSON.parse(row.auth_request) as AuthRequest;
+      const scopes = request.scope.length > 0 ? request.scope.filter(isScope) : [...new Set(Object.values(SCOPE_FOR))];
+      try {
+        socket.send(JSON.stringify({
+          type: "link_request", version: PROTOCOL_VERSION, link_id: row.id, code: row.code, binding: await linkBinding(row.id, request),
+          oauth_client_id: request.clientId, redirect_host: new URL(request.redirectUri).host, scopes, expires_at: row.expires_at,
+        }));
+      } catch { return; }
+    }
+  }
+
   /** Cheap pre-check before the browser's one-use consent handle is spent. */
   async linkPreflight(): Promise<"ok" | "offline" | "rate_limited" | "busy"> {
     await this.applyReset();

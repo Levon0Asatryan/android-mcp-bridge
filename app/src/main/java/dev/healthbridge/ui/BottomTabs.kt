@@ -13,8 +13,8 @@ import dev.healthbridge.R
 
 @Composable
 fun BottomTabs(selected: Int, select: (Int) -> Unit) {
-    val labels = listOf("Home", "Apps", "Activity", "Settings")
-    val icons = listOf(R.drawable.tab_home, R.drawable.tab_apps, R.drawable.tab_activity, R.drawable.tab_settings)
+    val labels = listOf("Home", "Apps", "Activity", "Approvals", "Settings")
+    val icons = listOf(R.drawable.tab_home, R.drawable.tab_apps, R.drawable.tab_activity, R.drawable.tab_approvals, R.drawable.tab_settings)
     Surface(color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.navigationBarsPadding()) {
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))

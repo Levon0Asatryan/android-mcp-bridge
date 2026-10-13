@@ -22,7 +22,6 @@ fun BridgeUi(model: UiModel, permissions: () -> Unit, manageHealth: () -> Unit, 
              approve: (String) -> Unit, pair: (String, String) -> Unit, approveLink: (String, Set<String>) -> Unit = { _, _ -> }) {
     val app = model.app
     val ui by model.state.collectAsStateWithLifecycle()
-    val sharedText by model.sharedText.collectAsStateWithLifecycle()
     val deletion by app.phoneApproval.pending.collectAsStateWithLifecycle()
     val link by app.linkApproval.pending.collectAsStateWithLifecycle()
     val clients by app.database.dao().clients().collectAsStateWithLifecycle(initialValue = emptyList())
@@ -32,9 +31,7 @@ fun BridgeUi(model: UiModel, permissions: () -> Unit, manageHealth: () -> Unit, 
     var screen by rememberSaveable { mutableIntStateOf(0) }
     var connection by rememberSaveable { mutableStateOf(false) }
     BackHandler(connection) { connection = false }
-    var addingMeal by remember { mutableStateOf(false) }
     var clientFilter by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(sharedText) { if (sharedText != null) { screen = 0; addingMeal = true } }
     val dark = settings.theme == "Dark" || (settings.theme == "System" && isSystemInDarkTheme())
     val palette = if (dark) darkColorScheme(primary = Color.White, onPrimary = Color.Black,
         background = Color.Black, surface = Color(0xFF1C1C1E), secondary = Color(0xFFCCCCCC),
@@ -42,7 +39,7 @@ fun BridgeUi(model: UiModel, permissions: () -> Unit, manageHealth: () -> Unit, 
         else lightColorScheme(primary = Color(0xFF171717), onPrimary = Color.White,
             background = Color(0xFFF2F2F4), surface = Color.White,
             secondary = Color(0xFF555555), onSurfaceVariant = Color(0xFF707070))
-    val labels = listOf("Home", "Apps", "Activity", "Settings")
+    val labels = listOf("Home", "Apps", "Activity", "Approvals", "Settings")
     val scroll = rememberScrollState()
     LaunchedEffect(screen, connection) { scroll.scrollTo(0) }
     BackHandler(screen != 0 && !connection) { screen = 0; clientFilter = null }
@@ -69,9 +66,7 @@ fun BridgeUi(model: UiModel, permissions: () -> Unit, manageHealth: () -> Unit, 
                             Text("Read health data, add meals and remove your entries from a ChatGPT conversation.",
                                 color = palette.onSurfaceVariant)
                             PrimaryAction("Set up ChatGPT") { connection = true }
-                            SecondaryAction(if (addingMeal) "Close manual import" else "Import a meal manually") { addingMeal = !addingMeal }
                         }
-                        if (addingMeal) MealComposer(app, ui.busy, model::run, sharedText)
                         NavigationRow("Health permissions",
                             if (app.health.available()) "${ui.granted} of ${dev.healthbridge.health.HealthConnectManager.permissions.size} permissions enabled" else "Health Connect unavailable", permissions)
                         GatewayPanel(relay, settings.paired, clients.count { it.enabled && it.verifier != null }, ui.busy, start, stop)
@@ -82,7 +77,10 @@ fun BridgeUi(model: UiModel, permissions: () -> Unit, manageHealth: () -> Unit, 
                     }
                     1 -> ClientScreen(app, clients, ui.busy, model::run) { clientFilter = it; screen = 2 }
                     2 -> ActivityScreen(logs, clientFilter)
-                    3 -> SettingsScreen(app, settings, relay, ui.busy, permissions, manageHealth, start, stop, pair, model::run)
+                    3 -> ApprovalsScreen(link, deletion,
+                        { id -> app.linkApproval.respond(id, dev.healthbridge.security.LinkDecision(false)) }, approveLink,
+                        { id, ok -> if (ok) approve(id) else app.phoneApproval.respond(id, false) })
+                    4 -> SettingsScreen(app, settings, relay, ui.busy, permissions, manageHealth, start, stop, pair, model::run)
                 }
             }
         }
@@ -90,8 +88,8 @@ fun BridgeUi(model: UiModel, permissions: () -> Unit, manageHealth: () -> Unit, 
             AlertDialog(onDismissRequest = model::dismissError, title = { Text("Action failed") }, text = { Text(message) },
                 confirmButton = { TextButton(onClick = model::dismissError) { Text("Done") } })
         }
-        link?.let { request -> LinkDialog(request, { app.linkApproval.respond(request.linkId, dev.healthbridge.security.LinkDecision(false)) }, approveLink) }
-        deletion?.let { request ->
+        if (screen != 3) link?.let { request -> LinkDialog(request, { app.linkApproval.respond(request.linkId, dev.healthbridge.security.LinkDecision(false)) }, approveLink) }
+        if (screen != 3) deletion?.let { request ->
             Confirmation("Delete ${request.recordType} record?",
                 "${request.clientName} requested deletion of record ${request.recordId}. Only a HealthBridge-owned record can be deleted. This cannot be undone.",
                 { app.phoneApproval.respond(request.id, false) },
