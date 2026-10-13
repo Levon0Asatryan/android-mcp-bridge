@@ -1,4 +1,6 @@
-# Android MCP Bridge 🌉
+<p align="center"><img src="android-mcp-bridge-logo.png" width="128" alt="Android MCP Bridge logo"></p>
+
+# Android MCP Bridge
 
 Android MCP Bridge is a personal, privacy-first bridge connecting conversational AI assistants (such as ChatGPT Custom Actions and Model Context Protocol / MCP clients) directly to your Android health data stored in [AndroidX Health Connect](https://developer.android.com/health-and-fitness/guides/health-connect).
 
