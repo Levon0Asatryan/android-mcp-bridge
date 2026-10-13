@@ -36,12 +36,12 @@ fun ClientScreen(app: HealthBridgeApplication, clients: List<ClientEntity>, busy
         Panel(client.name) {
             Text(if (!client.enabled) "Disabled" else if (client.verifier == null) "Credential revoked" else "Enabled")
             Text(client.allowed().joinToString { it.label }.ifEmpty { "No health-data permissions" })
-            if (client.oauthClientId != null) Text("Linked through ChatGPT sign-in. Permissions can only be narrowed; disabling or revoking ends the OAuth grant, including refresh. Reconnect in ChatGPT to restore.",
+            if (client.oauthClientId != null) Text("Linked through ChatGPT sign-in. Permissions are fixed at approval; reconnect in ChatGPT to change them. Disabling or revoking ends the OAuth grant, including refresh. Reconnect in ChatGPT to restore.",
                 style = MaterialTheme.typography.bodySmall)
             Text("Last access: ${client.lastAccessedAt?.let(::localTime) ?: "Never"}")
             Text("Token expires: ${localTime(client.expiresAt)}")
             Text("ID: ${client.id}", style = MaterialTheme.typography.bodySmall)
-            PrimaryAction("Edit name and permissions", enabled = !busy) { editing = client }
+            if (client.oauthClientId == null) PrimaryAction("Edit name and permissions", enabled = !busy) { editing = client }
             SecondaryAction("View activity") { activity(client.id) }
             if (client.oauthClientId == null) SecondaryAction("Generate new token", enabled = !busy) { pending = client to "Regenerate" }
             SecondaryAction("Revoke access token", enabled = !busy && client.verifier != null) { pending = client to "Revoke" }
