@@ -23,6 +23,7 @@ fun SettingsScreen(app: BridgeApplication, settings: Settings, relay: RelayState
         NavigationRow("Connect ChatGPT", "Private GPT Actions setup") { page = "chatgpt" }
         NavigationRow("Security alerts", "Device sessions, first use and rejected credentials") { page = "security" }
         NavigationRow("Health Connect", "Permissions and read/write checks") { page = "health" }
+        NavigationRow("Alarms, notifications and speech", "Clock, notify and speak access") { page = "device" }
         NavigationRow("Samsung Health", "Synchronization setup guide") { page = "samsung" }
         NavigationRow("Connection", "Manual start only") { page = "gateway" }
         NavigationRow("Appearance", settings.theme) { page = "theme" }
@@ -44,6 +45,19 @@ fun SettingsScreen(app: BridgeApplication, settings: Settings, relay: RelayState
                     SecondaryAction("Open system permissions", onClick = manageHealth)
                 }
                 HealthTestPanel(app, settings.testRecordId, busy, run)
+            }
+            "device" -> {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val notifications = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+                Panel("Alarms, notifications and speech") {
+                    Text(if (notifications) "Notifications are on." else "Notifications are off. Alarm confirmations and AI messages cannot reach you.")
+                    SecondaryAction("Open notification settings") {
+                        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName))
+                    }
+                    Text("Alarms and timers use the Clock app. When this app is not on screen, tap the confirmation notification to finish.")
+                    Text("Speech uses the media volume and is refused when it is muted. Android shows only the next alarm to apps.")
+                }
             }
             "samsung" -> Panel("Samsung Health") {
                 Text("Open Samsung Health, then Settings and Health Connect. Enable synchronization for the data you want to use.")
@@ -70,8 +84,8 @@ fun SettingsScreen(app: BridgeApplication, settings: Settings, relay: RelayState
                 Text("Logs contain actions and outcomes, not nutrition or weight payloads.")
             }
             "about" -> Panel("Android MCP Bridge") {
-                Text("Version 1.0.0\nOfficial Android Health Connect SDK\nPrivate single-owner instance with ChatGPT Actions")
-                Text("No MCP, analytics or copied health database. Nutrition and weight can be added and read; steps are read-only.")
+                Text("Version 1.0.0\nOfficial Android Health Connect SDK\nPrivate single-owner instance with MCP (health, clock, notify modules)")
+                Text("No analytics or copied health database.")
                 Text("Authorized adds need no prompt. Deletion is limited to Android MCP Bridge-owned records and requires confirmation on this phone.")
                 Text("Personal, unofficial utility. Not affiliated with Samsung or OpenAI.")
             }

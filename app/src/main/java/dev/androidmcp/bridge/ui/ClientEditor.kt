@@ -18,7 +18,7 @@ fun ClientEditor(client: ClientEntity?, dismiss: () -> Unit, save: (String, Bool
     var confirm by remember { mutableStateOf(false) }
     if (confirm) {
         AlertDialog(onDismissRequest = { confirm = false }, title = { Text(if (client == null) "Generate credential?" else "Save access changes?") },
-            text = { Text("Allow ${name.trim()} to use only the selected health permissions. ${if (client == null) "The access token will be displayed once." else ""}") },
+            text = { Text("Allow ${name.trim()} to use only the selected permissions. ${if (client == null) "The access token will be displayed once." else ""}") },
             confirmButton = { TextButton(onClick = { confirm = false; save(name.trim(), enabled, allowed) }) { Text("Confirm") } },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } })
     } else AlertDialog(onDismissRequest = dismiss,

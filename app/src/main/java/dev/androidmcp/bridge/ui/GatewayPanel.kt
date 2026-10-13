@@ -12,7 +12,7 @@ fun GatewayPanel(relay: RelayState, paired: Boolean, clientCount: Int, busy: Boo
                  start: () -> Unit, stop: () -> Unit) {
     val relayActive = relay !is RelayState.Stopped && relay !is RelayState.NotPaired && relay !is RelayState.Failed
     val running = relayActive
-    Panel("Health access") {
+    Panel("Phone access") {
         Text(when {
             relay is RelayState.Connected -> "Connected to your instance"
             relay is RelayState.Waiting -> "Disconnected: ${relay.reason}. Retrying at " +
@@ -24,9 +24,9 @@ fun GatewayPanel(relay: RelayState, paired: Boolean, clientCount: Int, busy: Boo
             else -> "Stopped"
         }, color = if (relay is RelayState.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
         Text("$clientCount authorized applications", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        PrimaryAction(if (running) "Stop health access" else "Start health access",
+        PrimaryAction(if (running) "Stop phone access" else "Start phone access",
             enabled = !busy && (running || paired), onClick = if (running) stop else start)
-        Text("Health requests are refused while the phone is locked or battery saver is on. Stop here at any time.",
+        Text("Health requests are refused while the phone is locked or battery saver is on; alarms, notifications and speech still work. Stop here at any time.",
             style = MaterialTheme.typography.bodySmall)
     }
 }

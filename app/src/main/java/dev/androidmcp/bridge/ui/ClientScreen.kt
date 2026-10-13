@@ -35,7 +35,7 @@ fun ClientScreen(app: BridgeApplication, clients: List<ClientEntity>, busy: Bool
         SecondaryAction("Back to applications") { selectedId = null }
         Panel(client.name) {
             Text(if (!client.enabled) "Disabled" else if (client.verifier == null) "Credential revoked" else "Enabled")
-            Text(client.allowed().joinToString { it.label }.ifEmpty { "No health-data permissions" })
+            Text(client.allowed().joinToString { it.label }.ifEmpty { "No permissions" })
             if (client.oauthClientId != null) Text("Linked through ChatGPT sign-in. Permissions are fixed at approval; reconnect in ChatGPT to change them. Disabling or revoking ends the OAuth grant, including refresh. Reconnect in ChatGPT to restore.",
                 style = MaterialTheme.typography.bodySmall)
             Text("Last access: ${client.lastAccessedAt?.let(::localTime) ?: "Never"}")

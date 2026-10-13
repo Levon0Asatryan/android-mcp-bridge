@@ -63,7 +63,7 @@ fun BridgeUi(model: UiModel, permissions: () -> Unit, manageHealth: () -> Unit, 
                         Text("Android MCP Bridge", color = palette.onSurfaceVariant)
                         Panel("ChatGPT") {
                             Text("Connect ChatGPT as a private plugin.", style = MaterialTheme.typography.titleMedium)
-                            Text("Read health data, add meals and remove your entries from a ChatGPT conversation.",
+                            Text("Let an AI use your phone: health data, alarms and timers, notifications and speech.",
                                 color = palette.onSurfaceVariant)
                             PrimaryAction("Set up ChatGPT") { connection = true }
                         }

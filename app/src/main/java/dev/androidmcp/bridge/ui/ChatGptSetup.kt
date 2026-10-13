@@ -9,8 +9,8 @@ fun ChatGptSetup() {
         Text("Deploy the backend from this project to your own account with its OAuth client settings. See docs/standalone-setup.md.")
         Text("In Settings, open Instance pairing, enter the instance HTTPS address and the bootstrap secret, and confirm with your screen lock.")
     }
-    Panel("2. Start health access") {
-        Text("Tap Start health access on Home. The phone connects outward to your instance; no computer is needed.")
+    Panel("2. Start phone access") {
+        Text("Tap Start phone access on Home. The phone connects outward to your instance; no computer is needed.")
     }
     Panel("3. Add the plugin in ChatGPT") {
         Text("In ChatGPT on the web, open Plugins, choose + then Add custom MCP server.")
@@ -26,7 +26,7 @@ fun ChatGptSetup() {
         Text("Deletions need your biometric or PIN on this phone within 20 seconds. Health access is refused while the phone is locked or battery saver is on.")
     }
     Panel("Stop access anytime") {
-        Text("Stop health access on Home, or revoke the linked client under Apps. Revocation ends its OAuth grant, including refresh.")
+        Text("Stop phone access on Home, or revoke the linked client under Apps. Revocation ends its OAuth grant, including refresh.")
         Text("OpenAI and the instance host see request contents in transit. This is not end-to-end encryption.")
         Text("Links expire after ${dev.androidmcp.bridge.security.ClientManager.TOKEN_LIFETIME_DAYS} days. Reconnect the plugin in ChatGPT to renew.")
     }
