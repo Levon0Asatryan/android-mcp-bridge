@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.widget.RemoteViews
 import dev.androidmcp.bridge.BridgeApplication
 import dev.androidmcp.bridge.MainActivity
@@ -43,12 +42,12 @@ class PhoneAccessWidget : AppWidgetProvider() {
         private fun render(context: Context, state: RelayState, apps: Int): RemoteViews {
             val on = active(state)
             val (label, color) = when (state) {
-                is RelayState.Connected -> "Connected" to "#34D399"
-                is RelayState.Connecting, is RelayState.Waiting -> "Reconnecting" to "#FBBF24"
-                is RelayState.Paused -> "Paused" to "#FBBF24"
-                is RelayState.Failed -> "Action needed" to "#F87171"
-                RelayState.NotPaired -> "Not paired" to "#F87171"
-                RelayState.Stopped -> "Off" to "#FFFFFF"
+                is RelayState.Connected -> "Connected" to R.color.widget_ok
+                is RelayState.Connecting, is RelayState.Waiting -> "Reconnecting" to R.color.widget_warn
+                is RelayState.Paused -> "Paused" to R.color.widget_warn
+                is RelayState.Failed -> "Action needed" to R.color.widget_bad
+                RelayState.NotPaired -> "Not paired" to R.color.widget_bad
+                RelayState.Stopped -> "Off" to R.color.widget_off
             }
             val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             val toggle = if (on) PendingIntent.getService(context, 11, Intent(context, GatewayService::class.java).setAction("STOP"), flags)
@@ -56,8 +55,8 @@ class PhoneAccessWidget : AppWidgetProvider() {
             val open = PendingIntent.getActivity(context, 13, Intent(context, MainActivity::class.java), flags)
             return RemoteViews(context.packageName, R.layout.widget_phone_access).apply {
                 setTextViewText(R.id.widget_status, label)
-                setTextColor(R.id.widget_status, Color.parseColor(color))
-                setTextViewText(R.id.widget_apps, if (apps == 1) "1 app authorized" else "$apps apps authorized")
+                setTextColor(R.id.widget_status, context.getColor(color))
+                setTextViewText(R.id.widget_apps, if (apps == 1) "1 app" else "$apps apps")
                 setTextViewText(R.id.widget_toggle, if (on) "Turn off" else "Turn on")
                 setOnClickPendingIntent(R.id.widget_toggle, toggle)
                 setOnClickPendingIntent(R.id.widget_root, open)
