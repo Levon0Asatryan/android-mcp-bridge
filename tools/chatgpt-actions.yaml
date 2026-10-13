@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: Samsung ChatGPT Health Bridge
+  version: 1.0.0
+  description: Authenticated access to your Android Health Connect data through your private single-owner instance. Errors use error_category; a 504 outcome_unknown write must be retried with the same idempotency_key. Samsung Health visibility is not automatically verified.
+servers:
+  - url: https://YOUR-INSTANCE-HOST
+security:
+  - clientToken: []
+paths:
+  /v1/status:
+    get:
+      operationId: getGatewayStatus
+      summary: Check gateway and Health Connect availability
+      x-openai-isConsequential: false
+      responses:
+        "200": {description: Gateway status, content: {application/json: {schema: {$ref: "#/components/schemas/Result"}}}}
+  /v1/permissions:
+    get:
+      operationId: getMyPermissions
+      summary: Check the calling client's granted permissions
+      x-openai-isConsequential: false
+      responses:
+        "200": {description: Calling client's permissions, content: {application/json: {schema: {$ref: "#/components/schemas/Result"}}}}
+  /v1/nutrition:
+    get:
+      operationId: getNutrition
+      summary: Read nutrition records for an offset-aware date range
+      x-openai-isConsequential: false
+      parameters:
+        - {$ref: "#/components/parameters/Start"}
+        - {$ref: "#/components/parameters/End"}
+      responses:
+        "200": {description: Nutrition records, content: {application/json: {schema: {$ref: "#/components/schemas/Result"}}}}
+    post:
+      operationId: addNutrition
+      summary: Add a meal to Health Connect; phone must be unlocked; requires a unique idempotency_key, reused only to retry the same meal
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/Nutrition"}
+      responses:
+        "200": {description: Actual Health Connect insertion result, content: {application/json: {schema: {$ref: "#/components/schemas/Result"}}}}
+  /v1/nutrition/{record_id}:
+    delete:
+      operationId: deleteNutrition
+      summary: Delete only a HealthBridge-owned nutrition record; open HealthBridge and confirm within 20 seconds
+      x-openai-isConsequential: true
+      parameters:
+        - {$ref: "#/components/parameters/RecordId"}
+      responses:
+        "200": {description: Confirmed deletion, content: {application/json: {schema: {$ref: "#/components/schemas/Result"}}}}
+  /v1/weight:
+    get:
+      operationId: getWeight
+      summary: Read weight measurements for an offset-aware date range
+      x-openai-isConsequential: false
+      parameters:
+        - {$ref: "#/components/parameters/Start"}
+        - {$ref: "#/components/parameters/End"}
+      responses:
+        "200": {description: Weight records, content: {application/json: {schema: {$ref: "#/components/schemas/Result"}}}}
+    post:
+      operationId: addWeight
+      summary: Add weight in kilograms; phone must be unlocked; requires a unique idempotency_key, reused only to retry the same measurement
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/Weight"}
+      responses:
+        "200": {description: Actual insertion result, content: {application/json: {schema: {$ref: "#/components/schemas/Result"}}}}
+  /v1/weight/{record_id}:
+    delete:
+      operationId: deleteWeight
+      summary: Delete only a HealthBridge-owned weight measurement; confirm on the phone within 20 seconds
+      x-openai-isConsequential: true
+      parameters:
+        - {$ref: "#/components/parameters/RecordId"}
+      responses:
+        "200": {description: Confirmed deletion, content: {application/json: {schema: {$ref: "#/components/schemas/Result"}}}}
+  /v1/steps:
+    get:
+      operationId: getSteps
+      summary: Read a deduplicated step total for a date range
+      x-openai-isConsequential: false
+      parameters:
+        - {$ref: "#/components/parameters/Start"}
+        - {$ref: "#/components/parameters/End"}
+      responses:
+        "200": {description: Aggregated steps, content: {application/json: {schema: {$ref: "#/components/schemas/Result"}}}}
+components:
+  securitySchemes:
+    clientToken: {type: http, scheme: bearer, bearerFormat: HealthBridge client token}
+  parameters:
+    Start: {name: start_time, in: query, required: true, schema: {type: string, format: date-time}, description: Inclusive timestamp with UTC offset; read-history restrictions apply.}
+    End: {name: end_time, in: query, required: true, schema: {type: string, format: date-time}, description: Exclusive timestamp with UTC offset; query at most 366 days.}
+    RecordId: {name: record_id, in: path, required: true, schema: {type: string, maxLength: 200}, description: Exact record identifier returned by HealthBridge.}
+  schemas:
+    Result:
+      type: object
+      properties:
+        success: {type: boolean}
+        record_id: {type: string}
+        error_category: {type: string}
+        message: {type: string}
+        records: {type: array, items: {type: object, additionalProperties: true}}
+      additionalProperties: true
+    Nutrition:
+      type: object
+      additionalProperties: false
+      required: [meal_name, meal_type, timestamp, calories_kcal, protein_g, carbs_g, fat_g, idempotency_key]
+      properties:
+        meal_name: {type: string, minLength: 1, maxLength: 200}
+        meal_type: {type: string, enum: [breakfast, lunch, dinner, snack, unknown]}
+        timestamp: {type: string, format: date-time}
+        calories_kcal: {type: number, minimum: 0, maximum: 100000}
+        protein_g: {type: number, minimum: 0, maximum: 100000}
+        carbs_g: {type: number, minimum: 0, maximum: 100000}
+        fat_g: {type: number, minimum: 0, maximum: 100000}
+        sugar_g: {type: number, minimum: 0, maximum: 100000}
+        fiber_g: {type: number, minimum: 0, maximum: 100000}
+        sodium_mg: {type: number, minimum: 0, maximum: 100000}
+        idempotency_key: {type: string, minLength: 1, maxLength: 128}
+    Weight:
+      type: object
+      additionalProperties: false
+      required: [weight_kg, timestamp, idempotency_key]
+      properties:
+        weight_kg: {type: number, exclusiveMinimum: 0, maximum: 1000}
+        timestamp: {type: string, format: date-time}
+        idempotency_key: {type: string, minLength: 1, maxLength: 128}

@@ -1,0 +1,48 @@
+import { describe, expect, it } from "vitest";
+import { configuredOrigin } from "../src/index";
+import { routeAction, statusFor, TOKEN_PATTERN, validateArguments, withinOutputBudget } from "../src/protocol";
+
+describe("protocol policy", () => {
+  it("requires idempotency keys and exact finite fields for writes", () => {
+    const weight = { weight_kg: 70, timestamp: "2030-01-01T00:00:00+04:00", idempotency_key: "k" };
+    expect(validateArguments("add_weight", weight)).toBeNull();
+    expect(validateArguments("add_weight", { ...weight, idempotency_key: undefined })).not.toBeNull();
+    expect(validateArguments("add_weight", { weight_kg: 70, timestamp: weight.timestamp })).not.toBeNull();
+    expect(validateArguments("add_weight", { ...weight, weight_kg: Number.POSITIVE_INFINITY })).not.toBeNull();
+    expect(validateArguments("add_weight", { ...weight, weight_kg: 0 })).not.toBeNull();
+    expect(validateArguments("add_weight", { ...weight, note: "x" })).not.toBeNull();
+    expect(validateArguments("get_steps", { start_time: "2030-01-02T00:00:00Z", end_time: "2030-01-01T00:00:00Z" })).not.toBeNull();
+    expect(validateArguments("get_steps", { start_time: "2028-01-01T00:00:00Z", end_time: "2030-01-01T00:00:00Z" })).not.toBeNull();
+    expect(validateArguments("delete_weight", { record_id: "r".repeat(201) })).not.toBeNull();
+  });
+
+  it("maps only the fixed Actions routes", () => {
+    expect(routeAction("GET", new URL("https://h/v1/status"))?.operation).toBe("get_gateway_status");
+    expect(routeAction("DELETE", new URL("https://h/v1/weight/a%2Fb"))?.arguments).toEqual({ record_id: "a/b" });
+    expect(routeAction("POST", new URL("https://h/v1/steps"))).toBeNull();
+    expect(routeAction("GET", new URL("https://h/v1/status?x=1"))).toBeNull();
+    expect(routeAction("PUT", new URL("https://h/v1/nutrition"))).toBeNull();
+  });
+
+  it("enforces both byte and character output budgets", () => {
+    expect(withinOutputBudget("a".repeat(65_000))).toBe(true);
+    expect(withinOutputBudget("€".repeat(22_000))).toBe(false);
+    expect(withinOutputBudget("a".repeat(90_001))).toBe(false);
+  });
+
+  it("keeps structured categories stable", () => {
+    expect(statusFor("unauthorized")).toBe(401);
+    expect(statusFor("phone_locked")).toBe(403);
+    expect(statusFor("outcome_unknown")).toBe(504);
+    expect(statusFor("anything-else")).toBe(502);
+    expect(TOKEN_PATTERN.test(`hb.${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}.${"A".repeat(43)}`)).toBe(true);
+  });
+
+  it("accepts only canonical HTTPS or loopback origins", () => {
+    expect(configuredOrigin("https://bridge.example.test")).toBe("https://bridge.example.test");
+    expect(configuredOrigin("http://localhost:8787")).toBe("http://localhost:8787");
+    expect(configuredOrigin("http://bridge.example.test")).toBeNull();
+    expect(configuredOrigin("https://bridge.example.test/")).toBeNull();
+    expect(configuredOrigin("https://user@bridge.example.test")).toBeNull();
+  });
+});

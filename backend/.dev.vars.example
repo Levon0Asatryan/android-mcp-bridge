@@ -1,0 +1,10 @@
+# Copy to .dev.vars for local `wrangler dev` only. Never commit the copy.
+# For a deployed instance, store OWNER_BOOTSTRAP_TOKEN with `wrangler secret put OWNER_BOOTSTRAP_TOKEN`.
+# Generate a fresh value, for example: openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+OWNER_BOOTSTRAP_TOKEN=replace-with-a-fresh-random-value-of-at-least-43-characters
+# Exact public origin of this instance: scheme + host (+ port), no path or trailing slash.
+PUBLIC_ORIGIN=http://localhost:8787
+# Raise to a larger integer to clear pairing and client registrations (also set a NEW bootstrap secret).
+PAIRING_RESET_EPOCH=0
+# Optional, milliseconds, clamped to 100-30000. Default 30000.
+# RELAY_DEADLINE_MS=30000

@@ -1,0 +1,56 @@
+# OS & IDE artifacts
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+
+# Android & Gradle
+.gradle/
+.kotlin/
+build/
+**/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.jks
+*.keystore
+*.p12
+*.pfx
+
+# Node & Cloudflare Worker
+node_modules/
+**/node_modules/
+.wrangler/
+**/.wrangler/
+dist/
+**/dist/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+*.pem
+*.key
+*.cert
+*.crt
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+

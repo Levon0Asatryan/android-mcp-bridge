@@ -1,0 +1,19 @@
+// Generic configuration only. Set the real origin and secrets privately; see ../docs/standalone-setup.md.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "health-bridge",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "durable_objects": {
+    "bindings": [{ "name": "BRIDGE", "class_name": "BridgeObject" }]
+  },
+  // OAuth grants/tokens (hashed or encrypted by @cloudflare/workers-oauth-provider). Create the namespace and add its id.
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "678dfd5fed084cb0a70448c48a700efc" }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BridgeObject"] }],
+  "vars": {
+    "PUBLIC_ORIGIN": "https://health-bridge.example.invalid",
+    "PAIRING_RESET_EPOCH": "0"
+  }
+}
