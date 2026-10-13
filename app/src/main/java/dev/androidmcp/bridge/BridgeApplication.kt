@@ -16,6 +16,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Log
 import dev.androidmcp.bridge.api.HealthActions
+import dev.androidmcp.bridge.device.*
 import dev.androidmcp.bridge.relay.DeviceConditions
 import dev.androidmcp.bridge.relay.KeystoreDeviceIdentity
 import dev.androidmcp.bridge.relay.RelayException
@@ -62,13 +63,18 @@ class BridgeApplication : Application() {
     val linkApproval = LinkApproval { securityAlert("Open Android MCP Bridge to review a ChatGPT connection request.") }
     val audit by lazy { AuditLogger(database.dao(), settings) }
     val phoneApproval = PhoneApproval()
+    private val visibility = VisibilityTracker()
     fun phoneUnlocked(): Boolean {
         val keyguard = getSystemService(KeyguardManager::class.java)
         return keyguard.isDeviceSecure && !keyguard.isDeviceLocked
     }
     fun powerSaving(): Boolean = getSystemService(PowerManager::class.java).isPowerSaveMode
     val relay: RelayManager by lazy {
-        val actions = HealthActions(health, clients, audit, phoneApproval, ::phoneUnlocked, ::powerSaving) {
+        val deviceModules = listOf(
+            ClockModule(AndroidClock(this, visibility::visible)),
+            NotifyModule(AndroidNotifier(this), AndroidSpeaker(this)),
+        )
+        val actions = HealthActions(health, clients, audit, phoneApproval, ::phoneUnlocked, ::powerSaving, deviceModules) {
             relay.state.value is dev.androidmcp.bridge.relay.RelayState.Connected
         }
         RelayManager(scope, settings.settings, clients, actions, DeviceConditions(this, phoneApproval::invalidate),
@@ -96,6 +102,7 @@ class BridgeApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        registerActivityLifecycleCallbacks(visibility)
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(SECURITY_CHANNEL, "Security alerts", NotificationManager.IMPORTANCE_HIGH))
     }

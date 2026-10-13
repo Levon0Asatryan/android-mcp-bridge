@@ -30,23 +30,25 @@ export const OPERATIONS = [
   "get_workouts", "add_workout", "get_heart_rate", "get_active_calories", "get_body_measurements",
   "add_body_measurement", "get_daily_summary", "get_data_freshness",
   "get_oxygen_saturation", "add_oxygen_saturation", "get_vitals", "get_activity_detail", "get_mindfulness", "add_mindfulness",
+  "set_alarm", "dismiss_alarm", "get_next_alarm", "show_alarms", "set_timer", "send_notification", "speak",
 ] as const;
 export type Operation = (typeof OPERATIONS)[number];
 
-export const isWrite = (op: Operation) => op.startsWith("add_") || op.startsWith("update_");
+const ACTION_OPERATIONS: readonly string[] = ["set_alarm", "dismiss_alarm", "show_alarms", "set_timer", "send_notification", "speak"];
+export const isWrite = (op: Operation) => op.startsWith("add_") || op.startsWith("update_") || ACTION_OPERATIONS.includes(op);
 export const isDelete = (op: Operation) => op.startsWith("delete_");
 
 export type ErrorCategory =
   | "unauthorized" | "permission_denied" | "health_permission_denied" | "phone_locked" | "power_saving"
   | "phone_unavailable" | "approval_required" | "approval_denied" | "approval_pending" | "expired_request"
   | "idempotency_conflict" | "result_too_large" | "rate_limited" | "outcome_unknown" | "invalid_input"
-  | "health_unavailable" | "not_found" | "protocol_error" | "not_configured" | "already_paired" | "not_paired";
+  | "health_unavailable" | "module_unavailable" | "not_found" | "protocol_error" | "not_configured" | "already_paired" | "not_paired";
 
 export const STATUS: Record<ErrorCategory, number> = {
   unauthorized: 401, permission_denied: 403, health_permission_denied: 403, phone_locked: 403,
   power_saving: 403, approval_required: 403, approval_denied: 403, phone_unavailable: 503,
   approval_pending: 409, expired_request: 504, idempotency_conflict: 409, result_too_large: 422,
-  rate_limited: 429, outcome_unknown: 504, invalid_input: 400, health_unavailable: 503,
+  rate_limited: 429, outcome_unknown: 504, invalid_input: 400, health_unavailable: 503, module_unavailable: 503,
   not_found: 404, protocol_error: 502, not_configured: 503, already_paired: 409, not_paired: 409,
 };
 
@@ -80,6 +82,7 @@ export const NUTRIENT_KEYS = [
   "vitamin_a_mcg", "vitamin_b6_mg", "vitamin_b12_mcg", "vitamin_c_mg", "vitamin_d_mcg", "vitamin_e_mg", "vitamin_k_mcg",
   "thiamin_mg", "riboflavin_mg", "niacin_mg", "folate_mcg", "folic_acid_mcg", "biotin_mcg", "pantothenic_acid_mg", "caffeine_mg",
 ] as const;
+export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 export const MINDFULNESS_TYPES = ["meditation", "breathing", "music", "movement", "unguided", "other"] as const;
 const NUTRITION_FIELDS: string[] = ["meal_name", "meal_type", "timestamp", "calories_kcal", "protein_g", "carbs_g", "fat_g", ...NUTRIENT_KEYS];
 /** Body composition fields accepted by add_body_measurement, with their upper bounds. */
@@ -143,6 +146,8 @@ export function validateArguments(op: Operation, args: unknown): string | null {
   switch (op) {
     case "get_gateway_status":
     case "get_permissions":
+    case "get_next_alarm":
+    case "show_alarms":
     case "get_data_freshness":
       return Object.keys(args).length === 0 ? null : "No arguments are accepted.";
     case "get_nutrition":
@@ -250,6 +255,50 @@ export function validateArguments(op: Operation, args: unknown): string | null {
       if (!exactKeys(args, ["weight_kg", "timestamp", "idempotency_key"])) return "Provide exactly weight_kg, timestamp and idempotency_key.";
       if (!measure(args.weight_kg, 0, 1000, true)) return "weight_kg must be greater than 0 and at most 1000.";
       if (!timestamp(args.timestamp)) return "Use an ISO 8601 timestamp with an explicit UTC offset.";
+      return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
+    }
+    case "set_alarm": {
+      if (!exactKeys(args, ["hour", "minute", "idempotency_key"], ["label", "days"])) return "Provide hour, minute and idempotency_key, optionally label and days.";
+      if (!Number.isInteger(args.hour) || (args.hour as number) < 0 || (args.hour as number) > 23) return "hour must be an integer 0-23.";
+      if (!Number.isInteger(args.minute) || (args.minute as number) < 0 || (args.minute as number) > 59) return "minute must be an integer 0-59.";
+      if (args.label !== undefined && args.label !== null && !text(args.label, 100)) return "label must contain 1-100 characters.";
+      if (args.days !== undefined && args.days !== null) {
+        const days = args.days;
+        if (!Array.isArray(days) || days.length < 1 || days.length > 7 || new Set(days).size !== days.length ||
+          !days.every((d) => typeof d === "string" && (WEEKDAYS as readonly string[]).includes(d))) return `days must be 1-7 distinct values of ${WEEKDAYS.join(", ")}.`;
+      }
+      return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
+    }
+    case "set_timer": {
+      if (!exactKeys(args, ["seconds", "idempotency_key"], ["label"])) return "Provide seconds and idempotency_key, optionally label.";
+      if (!Number.isInteger(args.seconds) || (args.seconds as number) < 1 || (args.seconds as number) > 86_400) return "seconds must be an integer 1-86400.";
+      if (args.label !== undefined && args.label !== null && !text(args.label, 100)) return "label must contain 1-100 characters.";
+      return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
+    }
+    case "dismiss_alarm": {
+      if (!exactKeys(args, ["mode"], ["hour", "minute", "label"])) return "Provide mode, plus hour and minute (mode time) or label (mode label).";
+      if (args.mode === "next") return Object.keys(args).length === 1 ? null : "mode next takes no other fields.";
+      if (args.mode === "time") {
+        if (!exactKeys(args, ["mode", "hour", "minute"])) return "mode time needs exactly hour and minute.";
+        if (!Number.isInteger(args.hour) || (args.hour as number) < 0 || (args.hour as number) > 23) return "hour must be an integer 0-23.";
+        return Number.isInteger(args.minute) && (args.minute as number) >= 0 && (args.minute as number) <= 59 ? null : "minute must be an integer 0-59.";
+      }
+      if (args.mode === "label") {
+        if (!exactKeys(args, ["mode", "label"])) return "mode label needs exactly label.";
+        return text(args.label, 100) ? null : "label must contain 1-100 characters.";
+      }
+      return "mode must be next, time or label.";
+    }
+    case "send_notification": {
+      if (!exactKeys(args, ["title", "message", "idempotency_key"], ["priority"])) return "Provide title, message and idempotency_key, optionally priority.";
+      if (!text(args.title, 80)) return "title must contain 1-80 characters.";
+      if (!text(args.message, 500)) return "message must contain 1-500 characters.";
+      if (args.priority !== undefined && args.priority !== "normal" && args.priority !== "high") return "priority must be normal or high.";
+      return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
+    }
+    case "speak": {
+      if (!exactKeys(args, ["message", "idempotency_key"])) return "Provide exactly message and idempotency_key.";
+      if (!text(args.message, 500)) return "message must contain 1-500 characters.";
       return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
     }
     case "delete_nutrition":

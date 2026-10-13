@@ -224,6 +224,8 @@ the new scopes are requested and approved on the phone.
 
 - **Rename:** app "Android MCP Bridge", package `dev.androidmcp.bridge`, worker and repo `android-mcp-bridge`, token prefix `amb.`, MCP server name `android-mcp`. Scopes are `health.*`; Android has a `BridgeModule` interface (`HealthActions` is the `health` module). New adaptive launcher icon (bridge arch with a node). New install, so pair again; new worker has new secrets (kept in gitignored `backend/.secrets.local`).
 
+- **Clock and Notify modules:** `clock_set_alarm`, `clock_dismiss_alarm`, `clock_get_next_alarm`, `clock_show_alarms`, `clock_set_timer`, `notify_send_notification`, `notify_speak`. Scopes `clock.alarm.read|set|dismiss`, `clock.timer.set`, `notify.send`, `notify.speak`. Alarms and timers use the standard `AlarmClock` intents (Samsung Clock honours them). Android blocks background activity starts, so unless the app is on screen the request becomes a "Tap to confirm" notification and the result says `awaiting_tap_on_phone`. Android reveals only the next alarm, never the list. Speech uses the phone's text-to-speech on the media stream and fails when it is muted. Notifications hide their text on the lock screen. Notes were rejected (no Samsung Notes API). Not yet run on a real phone.
+
 **After updating:** redeploy, reinstall, grant the new Health Connect permissions, tap Start in the gateway panel, then delete and re-create the ChatGPT connector (new tool names and scopes).
 
 ## 11. Known gaps

@@ -89,4 +89,22 @@ describe("detail nutrients and new operations", () => {
     expect(validateArguments("add_mindfulness", { ...span, session_type: "meditation" })).toBeNull();
     expect(validateArguments("add_mindfulness", { ...span, session_type: "nap" })).not.toBeNull();
   });
+  it("validates clock and notify actions", () => {
+    const k = { idempotency_key: "k" };
+    expect(validateArguments("set_alarm", { hour: 7, minute: 30, days: ["mon", "fri"], label: "Gym", ...k })).toBeNull();
+    expect(validateArguments("set_alarm", { hour: 24, minute: 0, ...k })).not.toBeNull();
+    expect(validateArguments("set_alarm", { hour: 7, minute: 0, days: ["mon", "mon"], ...k })).not.toBeNull();
+    expect(validateArguments("set_alarm", { hour: 7, minute: 0 })).not.toBeNull();
+    expect(validateArguments("set_timer", { seconds: 600, ...k })).toBeNull();
+    expect(validateArguments("set_timer", { seconds: 0, ...k })).not.toBeNull();
+    expect(validateArguments("dismiss_alarm", { mode: "next" })).toBeNull();
+    expect(validateArguments("dismiss_alarm", { mode: "time", hour: 7, minute: 0 })).toBeNull();
+    expect(validateArguments("dismiss_alarm", { mode: "all" })).not.toBeNull();
+    expect(validateArguments("dismiss_alarm", { mode: "next", hour: 1 })).not.toBeNull();
+    expect(validateArguments("get_next_alarm", {})).toBeNull();
+    expect(validateArguments("send_notification", { title: "Hi", message: "Drink water", priority: "high", ...k })).toBeNull();
+    expect(validateArguments("send_notification", { title: "Hi", message: "x".repeat(501), ...k })).not.toBeNull();
+    expect(validateArguments("speak", { message: "Dinner is ready", ...k })).toBeNull();
+    expect(validateArguments("speak", { message: " ", ...k })).not.toBeNull();
+  });
 });

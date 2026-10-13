@@ -2,7 +2,7 @@ import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { Env, McpOutcome } from "./bridge";
 import { bearerChallenge, type GrantProps } from "./oauth";
-import { EXERCISE_TYPES, LIMITS, MAX_BATCH, MINDFULNESS_TYPES, NUTRIENT_KEYS, type Operation } from "./protocol";
+import { EXERCISE_TYPES, LIMITS, MAX_BATCH, MINDFULNESS_TYPES, NUTRIENT_KEYS, WEEKDAYS, type Operation } from "./protocol";
 import { SCOPE_FOR } from "./scopes";
 
 /** Present only after the provider validated issuer, audience (this /mcp resource), expiry and client. */
@@ -34,6 +34,8 @@ const result = z.object({}).passthrough();
 export const MODULES = {
   core: { title: "Bridge", description: "Connection and permission status." },
   health: { title: "Health", description: "Health Connect data: nutrition, body, activity, sleep, vitals, mindfulness." },
+  clock: { title: "Clock", description: "Alarms and timers in the phone's Clock app." },
+  notify: { title: "Notify", description: "Notifications and spoken messages on the phone." },
 } as const;
 export type ModuleName = keyof typeof MODULES;
 
@@ -116,6 +118,31 @@ const TOOLS: Record<string, ToolSpec> = {
       session_type: z.enum(MINDFULNESS_TYPES), ...span, title: z.string().min(1).max(200).nullable().optional(),
       notes: z.string().min(1).max(1000).nullable().optional(), idempotency_key: idempotency,
     }).strict() },
+  get_next_alarm: { module: "clock", operation: "get_next_alarm", title: "Next alarm", readOnly: true, destructive: false, idempotent: true, input: empty,
+    description: "The next alarm that will ring on the phone (from any alarm app), with its time. Android does not reveal any other alarm." },
+  set_alarm: { module: "clock", operation: "set_alarm", title: "Set alarm", readOnly: false, destructive: false, idempotent: true,
+    description: "Create an alarm in the phone's Clock app at hour:minute (24-hour, phone time zone), optionally repeating on days. If the phone is not in use the owner may need to tap a notification to finish; the result says which. Retrying with the same idempotency_key does not create a duplicate.",
+    input: z.object({
+      hour: z.number().int().min(0).max(23), minute: z.number().int().min(0).max(59), label: z.string().min(1).max(100).nullable().optional(),
+      days: z.array(z.enum(WEEKDAYS)).min(1).max(7).nullable().optional().describe("Repeat days; omit for a one-time alarm."), idempotency_key: idempotency,
+    }).strict() },
+  dismiss_alarm: { module: "clock", operation: "dismiss_alarm", title: "Dismiss alarm", readOnly: false, destructive: true, idempotent: false,
+    description: "Dismiss or remove an alarm in the phone's Clock app: the next one, one at a given time, or one with a given label. Best effort; the Clock app decides.",
+    input: z.object({
+      mode: z.enum(["next", "time", "label"]), hour: z.number().int().min(0).max(23).optional(), minute: z.number().int().min(0).max(59).optional(),
+      label: z.string().min(1).max(100).optional(),
+    }).strict() },
+  show_alarms: { module: "clock", operation: "show_alarms", title: "Show alarms", readOnly: false, destructive: false, idempotent: true, input: empty,
+    description: "Open the alarm list in the phone's Clock app so the owner can see it." },
+  set_timer: { module: "clock", operation: "set_timer", title: "Start timer", readOnly: false, destructive: false, idempotent: true,
+    description: "Start a countdown timer in the phone's Clock app (1 second to 24 hours). Retrying with the same idempotency_key does not create a duplicate.",
+    input: z.object({ seconds: z.number().int().min(1).max(86_400), label: z.string().min(1).max(100).nullable().optional(), idempotency_key: idempotency }).strict() },
+  send_notification: { module: "notify", operation: "send_notification", title: "Send notification", readOnly: false, destructive: false, idempotent: true,
+    description: "Show a notification on the phone. Use priority high only for something urgent: it pops up on screen. Retrying with the same idempotency_key does not create a duplicate.",
+    input: z.object({ title: z.string().min(1).max(80), message: z.string().min(1).max(500), priority: z.enum(["normal", "high"]).optional(), idempotency_key: idempotency }).strict() },
+  speak: { module: "notify", operation: "speak", title: "Speak aloud", readOnly: false, destructive: false, idempotent: true,
+    description: "Read a message aloud on the phone speaker (text to speech, up to 500 characters). Fails if the media volume is muted. Retrying with the same idempotency_key does not repeat it.",
+    input: z.object({ message: z.string().min(1).max(500), idempotency_key: idempotency }).strict() },
   get_daily_summary: { operation: "get_daily_summary", title: "Daily health summary", readOnly: true, destructive: false, idempotent: true,
     description: "One-call summary of a calendar day in the phone's time zone: nutrition (totals per source), hydration, steps, workouts, sleep, weight, body measurements, active calories and heart rate. Sections the connection may not read are reported as not_permitted. Today is summarised up to now.",
     input: z.object({ date: z.string().length(10).describe("Calendar date, YYYY-MM-DD, in the phone's time zone.") }).strict() },
@@ -123,7 +150,10 @@ const TOOLS: Record<string, ToolSpec> = {
     description: "Per data type, which apps wrote data in the last 30 days and when each last wrote or synced (e.g. Samsung Health vs Android MCP Bridge). Use it to tell missing data from data that has not synced yet." },
 };
 
-const toolName = (key: string, spec: ToolSpec) => (spec.module ?? "health") === "core" ? key : `health_${key}`;
+const toolName = (key: string, spec: ToolSpec) => {
+  const module = spec.module ?? "health";
+  return module === "core" ? key : `${module}_${key}`;
+};
 
 function server(env: Env, origin: string, auth: McpAuth | null): McpServer {
   const mcp = new McpServer({ name: "android-mcp", version: "1.0.0" }, { capabilities: { tools: {} } });
@@ -143,7 +173,7 @@ function server(env: Env, origin: string, auth: McpAuth | null): McpServer {
       annotations: { readOnlyHint: spec.readOnly, destructiveHint: spec.destructive, idempotentHint: spec.idempotent, openWorldHint: false },
       _meta: { securitySchemes: [{ type: "oauth2", scopes: [scope] }] },
     }, async (args: Record<string, unknown>) => {
-      if (!auth) return challenge(origin, "Sign in to use health tools.", undefined);
+      if (!auth) return challenge(origin, "Sign in to use phone tools.", undefined);
       if (!auth.scopes.includes(scope)) return challenge(origin, `This connection was not granted ${scope}.`, scope);
       const id = env.BRIDGE.idFromName("owner");
       const outcome = await env.BRIDGE.get(id).mcpExecute(spec.operation, args, auth.props, auth.scopes) as unknown as McpOutcome;

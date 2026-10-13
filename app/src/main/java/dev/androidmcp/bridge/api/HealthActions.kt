@@ -48,11 +48,12 @@ class HealthActions(
     private val approval: PhoneApproval = PhoneApproval(),
     private val phoneUnlocked: () -> Boolean = { true },
     private val powerSaving: () -> Boolean = { false },
+    private val modules: List<ActionModule> = emptyList(),
     private val running: () -> Boolean,
 ) : BridgeModule {
     override val id = "health"
     override val title = "Health"
-    override val operations get() = permissions
+    override val operations get() = healthOperations
     /**
      * Executes one authorized operation. Every phone-side gate (credential, client grant, lock, power saver,
      * Health Connect grant) is checked here independently of the backend's fingerprint check.
@@ -108,6 +109,7 @@ class HealthActions(
         catch (e: AuthenticationException) { throw e }
         catch (e: Exception) {
             val (category, message) = when (e) {
+                is ModuleException -> e.category to (e.message ?: "The operation is unavailable.")
                 is ApprovalDeniedException -> "approval_denied" to "The deletion was not approved on the phone. No change was made."
                 is ApprovalBusyException -> "approval_pending" to "Another deletion is awaiting confirmation on the phone."
                 is ClientPermissionException -> "permission_denied" to "This application does not have permission. Change its access on the phone."
@@ -136,6 +138,7 @@ class HealthActions(
 
     private suspend fun perform(operation: String, args: JsonObject, client: ClientEntity, deadlineMillis: Long?,
                                 auth: OAuthBinding?): JsonObject {
+        modules.firstOrNull { operation in it.operations }?.let { return performModule(it, operation, args, client, deadlineMillis) }
         if (operation in gated) {
             checkLive(deadlineMillis)
             check(health.available()) { "Health Connect is unavailable." }
@@ -275,6 +278,22 @@ class HealthActions(
     }
 
 
+    private suspend fun performModule(module: ActionModule, operation: String, args: JsonObject, client: ClientEntity, deadlineMillis: Long?): JsonObject {
+        currentCoroutineContext().ensureActive()
+        if (deadlineMillis != null && System.currentTimeMillis() >= deadlineMillis) throw RequestExpiredException()
+        if (operation !in module.idempotent) return module.run(operation, args)
+        val key = (args["idempotency_key"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+        val body = JsonObject(args.filterKeys { it != "idempotency_key" }.toSortedMap())
+        var result: JsonObject? = null
+        val written = clients.writeOnce(client, operation, key, body.toString(), Instant.now().toString()) { recordKey ->
+            result = module.run(operation, body)
+            WriteResult(record_id = recordKey, timestamp = Instant.now().toString())
+        }
+        return result?.let { JsonObject(it + ("record_id" to text(written.record_id))) }
+            ?: obj("success" to JsonPrimitive(true), "replayed" to JsonPrimitive(true), "record_id" to text(written.record_id),
+                "message" to text("This idempotency_key was already used; the action was not repeated."))
+    }
+
     private fun writeResult(result: WriteResult, recorded: JsonElement) =
         JsonObject(bridgeJson.encodeToJsonElement(result).jsonObject + ("recorded_values" to recorded))
 
@@ -388,7 +407,7 @@ class HealthActions(
     companion object {
         const val MAX_BATCH = 20
         val DATA_TYPES = listOf("nutrition", "weight", "steps", "hydration", "sleep", "workouts", "heart_rate", "active_calories", "body_measurements", "oxygen", "vitals", "activity", "mindfulness")
-        val permissions = mapOf(
+        val healthOperations = mapOf(
             "get_gateway_status" to null, "get_permissions" to null,
             "get_nutrition" to ClientPermission.NUTRITION_READ, "add_nutrition" to ClientPermission.NUTRITION_WRITE,
             "get_weight" to ClientPermission.WEIGHT_READ, "add_weight" to ClientPermission.WEIGHT_WRITE,
@@ -405,6 +424,9 @@ class HealthActions(
             "get_vitals" to ClientPermission.VITALS_READ, "get_activity_detail" to ClientPermission.ACTIVITY_READ,
             "get_mindfulness" to ClientPermission.MINDFULNESS_READ, "add_mindfulness" to ClientPermission.MINDFULNESS_WRITE,
         )
+        /** Every operation the relay accepts, across modules. */
+        val permissions: Map<String, ClientPermission?> = healthOperations + dev.androidmcp.bridge.device.ClockModule.OPERATIONS +
+            dev.androidmcp.bridge.device.NotifyModule.OPERATIONS
         private const val HC = "android.permission.health."
         /** Any one of the listed Health Connect permissions is enough to start the operation. */
         private val healthPermissions: Map<String, Set<String>> = mapOf(
