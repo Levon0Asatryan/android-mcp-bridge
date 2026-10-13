@@ -25,6 +25,7 @@ import dev.androidmcp.bridge.relay.canonicalOrigin
 import dev.androidmcp.bridge.relay.pairDevice
 import dev.androidmcp.bridge.relay.relayHttpClient
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.int
@@ -103,6 +104,11 @@ class BridgeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         registerActivityLifecycleCallbacks(visibility)
+        scope.launch {
+            kotlinx.coroutines.flow.combine(relay.state, database.dao().clients()) { state, list ->
+                state to list.count { it.enabled && it.verifier != null }
+            }.distinctUntilChanged().collect { (state, apps) -> dev.androidmcp.bridge.widget.PhoneAccessWidget.refresh(this@BridgeApplication, state, apps) }
+        }
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(SECURITY_CHANNEL, "Security alerts", NotificationManager.IMPORTANCE_HIGH))
     }

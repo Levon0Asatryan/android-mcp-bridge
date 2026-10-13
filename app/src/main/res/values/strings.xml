@@ -1,0 +1,3 @@
+<resources>
+    <string name="widget_description">Shows phone access status, turns it on or off, and counts authorized apps.</string>
+</resources>
