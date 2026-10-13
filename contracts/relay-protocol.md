@@ -139,5 +139,16 @@ only `initialize`, `tools/list` and `bridge_connection_check` (returns
 `WWW-Authenticate` challenge. A present but invalid bearer gets `401`. Access
 tokens must have this instance's `/mcp` resource as audience, the predefined
 client ID and the tool's scope. Scopes: `bridge.status`, `nutrition.read|write|delete`,
-`weight.read|write|delete`, `steps.read`. Health calls then follow the same
+`weight.read|write|delete`, `steps.read`, `hydration.read|write`, `sleep.read|write`,
+`workouts.read|write`, `heart_rate.read`, `active_calories.read`, `body.read|write`,
+`summary.read`. Health calls then follow the same
 gates and outcomes as the Actions adapter.
+
+Extended operations (MCP only, not exposed by the Actions adapter):
+`update_nutrition {record_id, changes}`, `add_nutrition_batch {entries[1..20]}`,
+`get_hydration|get_sleep|get_workouts|get_heart_rate|get_active_calories|get_body_measurements {start_time, end_time}`,
+`add_hydration`, `add_sleep`, `add_workout`, `add_body_measurement`,
+`get_daily_summary {date}` and `get_data_freshness {}` (both need `summary.read`;
+each section is additionally gated by its own scope and Health Connect grant).
+`add_*` and `update_*` are mutating; only `delete_*` needs phone approval.
+Design notes are in [../docs/development-log.md](../docs/development-log.md).

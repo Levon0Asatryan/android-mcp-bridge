@@ -42,6 +42,73 @@ data class WeightEntry(val weight_kg: Double, val timestamp: String, val idempot
     }
 }
 
+val EXERCISE_TYPE_NAMES = setOf(
+    "strength_training", "running", "walking", "cycling", "swimming", "yoga", "pilates", "hiit", "hiking", "rowing",
+    "elliptical", "stair_climbing", "stretching", "dancing", "calisthenics", "other",
+)
+
+private fun validateSpan(start: String, end: String) {
+    val from = parseTime(start).toInstant()
+    val to = parseTime(end).toInstant()
+    require(from < to) { "start_time must precede end_time." }
+    require(to.epochSecond - from.epochSecond <= 86_400) { "A session can last at most 24 hours." }
+}
+
+@Serializable
+data class NutritionChanges(
+    val meal_name: String? = null, val meal_type: String? = null, val timestamp: String? = null,
+    val calories_kcal: Double? = null, val protein_g: Double? = null, val carbs_g: Double? = null, val fat_g: Double? = null,
+    val sugar_g: Double? = null, val fiber_g: Double? = null, val sodium_mg: Double? = null,
+) {
+    fun isEmpty() = listOf(meal_name, meal_type, timestamp, calories_kcal, protein_g, carbs_g, fat_g, sugar_g, fiber_g, sodium_mg).all { it == null }
+}
+
+@Serializable
+data class HydrationEntry(val volume_ml: Double, val timestamp: String, val idempotency_key: String? = null) {
+    fun validate() {
+        require(volume_ml.isFinite() && volume_ml > 0 && volume_ml <= 10_000) { "Volume must be greater than 0 and at most 10000 ml." }
+        parseTime(timestamp)
+        validateKey(idempotency_key)
+    }
+}
+
+@Serializable
+data class SleepEntry(val start_time: String, val end_time: String, val title: String? = null, val idempotency_key: String? = null) {
+    fun validate() {
+        validateSpan(start_time, end_time)
+        title?.let { require(it.isNotBlank() && it.length <= 200) { "Title must contain 1-200 characters." } }
+        validateKey(idempotency_key)
+    }
+}
+
+@Serializable
+data class WorkoutEntry(
+    val exercise_type: String, val start_time: String, val end_time: String,
+    val title: String? = null, val notes: String? = null, val idempotency_key: String? = null,
+) {
+    fun validate() {
+        require(exercise_type in EXERCISE_TYPE_NAMES) { "Unsupported exercise type." }
+        validateSpan(start_time, end_time)
+        title?.let { require(it.isNotBlank() && it.length <= 200) { "Title must contain 1-200 characters." } }
+        notes?.let { require(it.isNotBlank() && it.length <= 1000) { "Notes must contain 1-1000 characters." } }
+        validateKey(idempotency_key)
+    }
+}
+
+@Serializable
+data class BodyMeasurementEntry(
+    val timestamp: String, val body_fat_percent: Double? = null, val lean_body_mass_kg: Double? = null,
+    val idempotency_key: String? = null,
+) {
+    fun validate() {
+        require(body_fat_percent != null || lean_body_mass_kg != null) { "Provide body fat or lean body mass." }
+        body_fat_percent?.let { require(it.isFinite() && it > 0 && it <= 100) { "Body fat must be greater than 0 and at most 100." } }
+        lean_body_mass_kg?.let { require(it.isFinite() && it > 0 && it <= 1000) { "Lean body mass must be greater than 0 and at most 1000 kg." } }
+        parseTime(timestamp)
+        validateKey(idempotency_key)
+    }
+}
+
 @Serializable
 data class NutritionData(
     val id: String, val meal_name: String?, val meal_type: String,

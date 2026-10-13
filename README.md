@@ -11,14 +11,19 @@ It enables private AI interactions—such as logging meals, reviewing nutrition 
 ## 🌟 Key Features
 
 - **Read & Write Health Data**:
-  - **Nutrition**: Read meals and macros (calories, protein, carbohydrates, fats, fiber, sodium); log new meals.
+  - **Nutrition**: Read meals and macros (calories, protein, carbohydrates, fats, fiber, sodium); log new meals, save up to 20 at once, and correct a meal in place without duplicates.
   - **Weight**: Track weight records over time.
   - **Steps**: Read aggregated daily step counts from Health Connect.
+  - **Water, sleep, workouts**: Read and log hydration, sleep sessions and exercise sessions.
+  - **Heart rate & active calories**: Read summaries (average/min/max, resting average, kcal burned).
+  - **Body measurements**: Read and log body fat % and lean body mass (Health Connect has no waist type).
+  - **Daily summary & data freshness**: One-call day overview, and when each app (e.g. Samsung Health) last wrote each data type.
+  - **Source identification**: Every record reports the app that wrote it, to avoid double counting.
 - **Biometric & On-Device Approval**:
   - Record additions and read queries execute according to pre-approved client scopes.
   - Record deletions strictly require on-device biometric (fingerprint/face) or device PIN confirmation.
 - **Dual AI Interface**:
-  - **Model Context Protocol (MCP)**: Stateless Streamable HTTP MCP server (`@modelcontextprotocol/server`) providing 10 scoped tools.
+  - **Model Context Protocol (MCP)**: Stateless Streamable HTTP MCP server (`@modelcontextprotocol/server`) providing 24 scoped tools (the extended ones are MCP-only; see [docs/development-log.md](docs/development-log.md)).
   - **ChatGPT Custom Actions**: REST API endpoints conforming to OpenAPI 3.0 specification (`tools/chatgpt-actions.yaml`).
 - **OAuth 2.1 + PKCE Authorization**:
   - Secure authorization code flow with PKCE (`S256`) and interactive phone approval.

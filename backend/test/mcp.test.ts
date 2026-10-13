@@ -130,8 +130,11 @@ describe("MCP endpoint", () => {
   it("initializes, lists and calls the harmless check without auth, and refuses health tools", async () => {
     const client = await mcpClient();
     const tools = (await client.listTools()).tools;
-    expect(tools.map((t) => t.name).sort()).toEqual(["add_nutrition", "add_weight", "bridge_connection_check", "delete_nutrition",
-      "delete_weight", "get_bridge_status", "get_nutrition", "get_permissions", "get_steps", "get_weight"]);
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      "add_body_measurement", "add_hydration", "add_nutrition", "add_nutrition_batch", "add_sleep", "add_weight", "add_workout",
+      "bridge_connection_check", "delete_nutrition", "delete_weight", "get_active_calories", "get_body_measurements",
+      "get_bridge_status", "get_daily_summary", "get_data_freshness", "get_heart_rate", "get_hydration", "get_nutrition",
+      "get_permissions", "get_sleep", "get_steps", "get_weight", "get_workouts", "update_nutrition"]);
     const del = tools.find((t) => t.name === "delete_weight");
     expect(del?.annotations).toMatchObject({ destructiveHint: true, readOnlyHint: false });
     expect(tools.find((t) => t.name === "get_steps")?.annotations).toMatchObject({ readOnlyHint: true });

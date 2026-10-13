@@ -9,6 +9,10 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeParseException
 
 class PhoneLockedException : SecurityException("The phone is locked.")
 class PowerSavingException : SecurityException("Battery saver is on.")
@@ -56,7 +60,7 @@ class HealthActions(
         require(operation in permissions) { "Unsupported operation." }
         var caller: ClientEntity? = null
         try {
-            if (healthPermissions.containsKey(operation)) {
+            if (operation in gated) {
                 val blocked = when {
                     !phoneUnlocked() -> "phone_locked" to "Unlock the phone to allow health access."
                     powerSaving() -> "power_saving" to "Battery saver is on. Turn it off to allow health access."
@@ -82,10 +86,10 @@ class HealthActions(
             var result = clients.execute(token, permissions[operation], auth) { client ->
                 caller = client
                 withContext(HealthOperationGuard { checkLive(deadlineMillis) }) {
-                    perform(operation, arguments, client, deadlineMillis)
+                    perform(operation, arguments, client, deadlineMillis, auth)
                 }
             }
-            if (healthPermissions.containsKey(operation) && (!phoneUnlocked() || powerSaving())) {
+            if (operation in gated && (!phoneUnlocked() || powerSaving())) {
                 result = if (operation.startsWith("get_")) {
                     if (!phoneUnlocked()) failure("phone_locked", "Unlock the phone to allow health access.")
                     else failure("power_saving", "Battery saver is on. Turn it off to allow health access.")
@@ -127,18 +131,21 @@ class HealthActions(
         if (powerSaving()) throw PowerSavingException()
     }
 
-    private suspend fun perform(operation: String, args: JsonObject, client: ClientEntity, deadlineMillis: Long?): JsonObject {
-        healthPermissions[operation]?.let {
+    private suspend fun perform(operation: String, args: JsonObject, client: ClientEntity, deadlineMillis: Long?,
+                                auth: OAuthBinding?): JsonObject {
+        if (operation in gated) {
             checkLive(deadlineMillis)
             check(health.available()) { "Health Connect is unavailable." }
-            if (it !in health.grantedPermissions()) throw SecurityException("Health permission is not granted.")
+            healthPermissions[operation]?.let { needed ->
+                if (needed.none { it in health.grantedPermissions() }) throw SecurityException("Health permission is not granted.")
+            }
             checkLive(deadlineMillis)
         }
         return when (operation) {
             "get_gateway_status" -> {
                 require(args.isEmpty())
                 obj("running" to JsonPrimitive(running()), "health_connect_available" to JsonPrimitive(health.available()),
-                    "supported_data_types" to JsonArray(listOf("nutrition", "weight", "steps").map(::text)),
+                    "supported_data_types" to JsonArray(DATA_TYPES.map(::text)),
                     "gateway_version" to text("1.0.0"))
             }
             "get_permissions" -> {
@@ -146,7 +153,8 @@ class HealthActions(
                 obj("client_id" to text(client.id), "permissions" to JsonArray(client.allowed().sortedBy { it.name }.map { text(it.name) }),
                     "health_connect_permissions" to JsonArray(health.grantedPermissions().sorted().map(::text)))
             }
-            "get_nutrition", "get_weight", "get_steps" -> {
+            "get_nutrition", "get_weight", "get_steps", "get_hydration", "get_sleep", "get_workouts", "get_heart_rate",
+            "get_active_calories", "get_body_measurements" -> {
                 require(args.keys == setOf("start_time", "end_time"))
                 val start = args.getValue("start_time").jsonPrimitive.also { require(it.isString) }.content
                 val end = args.getValue("end_time").jsonPrimitive.also { require(it.isString) }.content
@@ -154,6 +162,12 @@ class HealthActions(
                 when (operation) {
                     "get_nutrition" -> obj("records" to bridgeJson.encodeToJsonElement(health.nutrition(start, end)))
                     "get_weight" -> obj("records" to bridgeJson.encodeToJsonElement(health.weight(start, end)))
+                    "get_hydration" -> health.hydration(start, end)
+                    "get_sleep" -> health.sleep(start, end)
+                    "get_workouts" -> health.workouts(start, end)
+                    "get_heart_rate" -> health.heartRate(start, end)
+                    "get_active_calories" -> health.activeCalories(start, end)
+                    "get_body_measurements" -> health.bodyMeasurements(start, end)
                     else -> obj("total_steps" to JsonPrimitive(health.steps(start, end)), "start_time" to text(start), "end_time" to text(end))
                 }
             }
@@ -177,6 +191,54 @@ class HealthActions(
                 JsonObject(bridgeJson.encodeToJsonElement(result).jsonObject +
                     ("recorded_values" to bridgeJson.encodeToJsonElement(entry.copy(idempotency_key = null))))
             }
+            "add_hydration" -> {
+                val entry = bridgeJson.decodeFromJsonElement<HydrationEntry>(args).also { it.validate() }
+                writeResult(clients.writeOnce(client, operation, entry.idempotency_key,
+                    bridgeJson.encodeToString(HydrationEntry.serializer(), entry.copy(idempotency_key = null)), entry.timestamp) {
+                    checkLive(deadlineMillis)
+                    nativeWrite { health.addHydration(entry, it) }
+                }, bridgeJson.encodeToJsonElement(entry.copy(idempotency_key = null)))
+            }
+            "add_sleep" -> {
+                val entry = bridgeJson.decodeFromJsonElement<SleepEntry>(args).also { it.validate() }
+                writeResult(clients.writeOnce(client, operation, entry.idempotency_key,
+                    bridgeJson.encodeToString(SleepEntry.serializer(), entry.copy(idempotency_key = null)), entry.start_time) {
+                    checkLive(deadlineMillis)
+                    nativeWrite { health.addSleep(entry, it) }
+                }, bridgeJson.encodeToJsonElement(entry.copy(idempotency_key = null)))
+            }
+            "add_workout" -> {
+                val entry = bridgeJson.decodeFromJsonElement<WorkoutEntry>(args).also { it.validate() }
+                writeResult(clients.writeOnce(client, operation, entry.idempotency_key,
+                    bridgeJson.encodeToString(WorkoutEntry.serializer(), entry.copy(idempotency_key = null)), entry.start_time) {
+                    checkLive(deadlineMillis)
+                    nativeWrite { health.addWorkout(entry, it) }
+                }, bridgeJson.encodeToJsonElement(entry.copy(idempotency_key = null)))
+            }
+            "add_body_measurement" -> {
+                val entry = bridgeJson.decodeFromJsonElement<BodyMeasurementEntry>(args).also { it.validate() }
+                writeResult(clients.writeOnce(client, operation, entry.idempotency_key,
+                    bridgeJson.encodeToString(BodyMeasurementEntry.serializer(), entry.copy(idempotency_key = null)), entry.timestamp) {
+                    checkLive(deadlineMillis)
+                    nativeWrite { health.addBodyMeasurement(entry, it) }
+                }, bridgeJson.encodeToJsonElement(entry.copy(idempotency_key = null)))
+            }
+            "update_nutrition" -> {
+                require(args.keys == setOf("record_id", "changes"))
+                val id = args.getValue("record_id").jsonPrimitive.also { require(it.isString) }.content
+                require(id.isNotBlank() && id.length <= 200)
+                val changes = bridgeJson.decodeFromJsonElement<NutritionChanges>(args.getValue("changes").jsonObject)
+                require(!changes.isEmpty())
+                checkLive(deadlineMillis)
+                val result = health.updateNutrition(id, changes)
+                JsonObject(bridgeJson.encodeToJsonElement(result).jsonObject + ("updated_fields" to bridgeJson.encodeToJsonElement(changes)))
+            }
+            "add_nutrition_batch" -> addNutritionBatch(args, client, deadlineMillis)
+            "get_daily_summary" -> dailySummary(args, client, deadlineMillis, auth)
+            "get_data_freshness" -> {
+                require(args.isEmpty())
+                health.freshness(freshnessTypes.filterValues { clients.permits(client, auth, it) }.keys)
+            }
             "delete_nutrition", "delete_weight" -> {
                 require(args.keys == setOf("record_id"))
                 val id = args.getValue("record_id").jsonPrimitive.also { require(it.isString) }.content
@@ -188,6 +250,96 @@ class HealthActions(
         }
     }
 
+
+    private fun writeResult(result: WriteResult, recorded: JsonElement) =
+        JsonObject(bridgeJson.encodeToJsonElement(result).jsonObject + ("recorded_values" to recorded))
+
+    /** One result per meal. A failed meal never blocks the others; retries are safe through per-entry idempotency keys. */
+    private suspend fun addNutritionBatch(args: JsonObject, client: ClientEntity, deadlineMillis: Long?): JsonObject {
+        require(args.keys == setOf("entries"))
+        val entries = args.getValue("entries").jsonArray.map { bridgeJson.decodeFromJsonElement<NutritionEntry>(it) }
+        require(entries.size in 1..MAX_BATCH) { "Provide 1-$MAX_BATCH entries." }
+        require(entries.map { it.idempotency_key }.toSet().size == entries.size) { "Each entry needs its own idempotency_key." }
+        val results = entries.mapIndexed { index, entry ->
+            checkLive(deadlineMillis)
+            try {
+                entry.validate()
+                val written = clients.writeOnce(client, "add_nutrition", entry.idempotency_key,
+                    bridgeJson.encodeToString(NutritionEntry.serializer(), entry.copy(idempotency_key = null)), entry.timestamp) {
+                    checkLive(deadlineMillis)
+                    nativeWrite { health.addNutrition(entry, it) }
+                }
+                buildJsonObject {
+                    put("index", index); put("success", true); put("meal_name", entry.meal_name)
+                    put("record_id", written.record_id); put("timestamp", written.timestamp)
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: SecurityException) { throw e }
+            catch (e: RequestExpiredException) { throw e }
+            catch (e: PhoneLockedException) { throw e }
+            catch (e: PowerSavingException) { throw e }
+            catch (e: IllegalArgumentException) { entryFailure(index, entry, "invalid_input", e.message ?: "Invalid entry.") }
+            catch (e: IdempotencyConflictException) { entryFailure(index, entry, "idempotency_conflict", "This key was already used with different arguments.") }
+            catch (e: OutcomeUnknownException) { entryFailure(index, entry, "outcome_unknown", "The write may or may not have completed. Retry with the same idempotency_key.") }
+        }
+        val succeeded = results.count { it["success"]?.jsonPrimitive?.boolean == true }
+        return obj("success" to JsonPrimitive(succeeded == results.size), "succeeded" to JsonPrimitive(succeeded),
+            "failed" to JsonPrimitive(results.size - succeeded), "results" to JsonArray(results))
+    }
+
+    private fun entryFailure(index: Int, entry: NutritionEntry, category: String, message: String) = buildJsonObject {
+        put("index", index); put("success", false); put("meal_name", entry.meal_name)
+        put("error_category", category); put("message", message)
+    }
+
+    private suspend fun dailySummary(args: JsonObject, client: ClientEntity, deadlineMillis: Long?, auth: OAuthBinding?): JsonObject {
+        require(args.keys == setOf("date"))
+        val raw = args.getValue("date").jsonPrimitive.also { require(it.isString) }.content
+        val date = try { LocalDate.parse(raw) } catch (e: DateTimeParseException) { throw IllegalArgumentException("date must be YYYY-MM-DD.", e) }
+        val zone = ZoneId.systemDefault()
+        require(!date.isAfter(LocalDate.now(zone))) { "Future dates are not accepted." }
+        val from = date.atStartOfDay(zone).toInstant()
+        val to = minOf(date.plusDays(1).atStartOfDay(zone).toInstant(), Instant.now()).let { if (it > from) it else from.plusSeconds(1) }
+        val start = from.atZone(zone).toOffsetDateTime().toString()
+        val end = to.atZone(zone).toOffsetDateTime().toString()
+
+        suspend fun section(permission: ClientPermission, needed: Set<String>, block: suspend () -> JsonObject): JsonElement {
+            if (!clients.permits(client, auth, permission)) return obj("status" to text("not_permitted"))
+            checkLive(deadlineMillis)
+            if (needed.none { it in health.grantedPermissions() }) return obj("status" to text("health_permission_not_granted"))
+            return try { JsonObject(obj("status" to text("ok")) + block()) }
+            catch (e: CancellationException) { throw e }
+            catch (e: SecurityException) { throw e }
+            catch (e: RequestExpiredException) { throw e }
+            catch (e: Exception) { obj("status" to text("error")) }
+        }
+        val sections = linkedMapOf<String, JsonElement>()
+        sections["nutrition"] = section(ClientPermission.NUTRITION_READ, healthPermissionsFor("get_nutrition")) {
+            val records = health.nutrition(start, end)
+            val bySource = records.groupBy { it.source_application }.toSortedMap().map { (source, list) ->
+                buildJsonObject {
+                    put("source_application", source); put("meals", list.size)
+                    put("calories_kcal", list.sumOf { it.calories_kcal ?: 0.0 }); put("protein_g", list.sumOf { it.protein_g ?: 0.0 })
+                    put("carbs_g", list.sumOf { it.carbs_g ?: 0.0 }); put("fat_g", list.sumOf { it.fat_g ?: 0.0 })
+                }
+            }
+            obj("totals_by_source" to JsonArray(bySource), "records" to bridgeJson.encodeToJsonElement(records))
+        }
+        sections["hydration"] = section(ClientPermission.HYDRATION_READ, healthPermissionsFor("get_hydration")) { health.hydration(start, end) }
+        sections["steps"] = section(ClientPermission.STEPS_READ, healthPermissionsFor("get_steps")) {
+            obj("total_steps" to JsonPrimitive(health.steps(start, end)), "sources" to JsonArray(health.stepSources(start, end).map(::text)))
+        }
+        sections["workouts"] = section(ClientPermission.WORKOUTS_READ, healthPermissionsFor("get_workouts")) { health.workouts(start, end) }
+        sections["sleep"] = section(ClientPermission.SLEEP_READ, healthPermissionsFor("get_sleep")) { health.sleep(start, end) }
+        sections["weight"] = section(ClientPermission.WEIGHT_READ, healthPermissionsFor("get_weight")) {
+            obj("records" to bridgeJson.encodeToJsonElement(health.weight(start, end)))
+        }
+        sections["body_measurements"] = section(ClientPermission.BODY_READ, healthPermissionsFor("get_body_measurements")) { health.bodyMeasurements(start, end) }
+        sections["active_calories"] = section(ClientPermission.ACTIVE_CALORIES_READ, healthPermissionsFor("get_active_calories")) { health.activeCalories(start, end) }
+        sections["heart_rate"] = section(ClientPermission.HEART_RATE_READ, healthPermissionsFor("get_heart_rate")) { health.heartRate(start, end) }
+        return JsonObject(obj("date" to text(raw), "time_zone" to text(zone.id), "start_time" to text(start), "end_time" to text(end)) + sections)
+    }
+
     /** Once a native write starts, failures other than a definite permission error are reported as uncertain. */
     private suspend fun <T> nativeWrite(block: suspend () -> T): T = try { block() }
         catch (e: CancellationException) { throw e }
@@ -196,21 +348,50 @@ class HealthActions(
         catch (e: Exception) { throw OutcomeUnknownException() }
 
     companion object {
+        const val MAX_BATCH = 20
+        val DATA_TYPES = listOf("nutrition", "weight", "steps", "hydration", "sleep", "workouts", "heart_rate", "active_calories", "body_measurements")
         val permissions = mapOf(
             "get_gateway_status" to null, "get_permissions" to null,
             "get_nutrition" to ClientPermission.NUTRITION_READ, "add_nutrition" to ClientPermission.NUTRITION_WRITE,
             "get_weight" to ClientPermission.WEIGHT_READ, "add_weight" to ClientPermission.WEIGHT_WRITE,
             "get_steps" to ClientPermission.STEPS_READ, "delete_nutrition" to ClientPermission.NUTRITION_DELETE,
             "delete_weight" to ClientPermission.WEIGHT_DELETE,
+            "update_nutrition" to ClientPermission.NUTRITION_WRITE, "add_nutrition_batch" to ClientPermission.NUTRITION_WRITE,
+            "get_hydration" to ClientPermission.HYDRATION_READ, "add_hydration" to ClientPermission.HYDRATION_WRITE,
+            "get_sleep" to ClientPermission.SLEEP_READ, "add_sleep" to ClientPermission.SLEEP_WRITE,
+            "get_workouts" to ClientPermission.WORKOUTS_READ, "add_workout" to ClientPermission.WORKOUTS_WRITE,
+            "get_heart_rate" to ClientPermission.HEART_RATE_READ, "get_active_calories" to ClientPermission.ACTIVE_CALORIES_READ,
+            "get_body_measurements" to ClientPermission.BODY_READ, "add_body_measurement" to ClientPermission.BODY_WRITE,
+            "get_daily_summary" to ClientPermission.SUMMARY_READ, "get_data_freshness" to ClientPermission.SUMMARY_READ,
         )
-        private val healthPermissions = mapOf(
-            "get_nutrition" to "android.permission.health.READ_NUTRITION",
-            "add_nutrition" to "android.permission.health.WRITE_NUTRITION",
-            "delete_nutrition" to "android.permission.health.WRITE_NUTRITION",
-            "get_weight" to "android.permission.health.READ_WEIGHT",
-            "add_weight" to "android.permission.health.WRITE_WEIGHT",
-            "delete_weight" to "android.permission.health.WRITE_WEIGHT",
-            "get_steps" to "android.permission.health.READ_STEPS",
+        private const val HC = "android.permission.health."
+        /** Any one of the listed Health Connect permissions is enough to start the operation. */
+        private val healthPermissions: Map<String, Set<String>> = mapOf(
+            "get_nutrition" to setOf(HC + "READ_NUTRITION"),
+            "add_nutrition" to setOf(HC + "WRITE_NUTRITION"),
+            "update_nutrition" to setOf(HC + "WRITE_NUTRITION"),
+            "add_nutrition_batch" to setOf(HC + "WRITE_NUTRITION"),
+            "delete_nutrition" to setOf(HC + "WRITE_NUTRITION"),
+            "get_weight" to setOf(HC + "READ_WEIGHT"),
+            "add_weight" to setOf(HC + "WRITE_WEIGHT"),
+            "delete_weight" to setOf(HC + "WRITE_WEIGHT"),
+            "get_steps" to setOf(HC + "READ_STEPS"),
+            "get_hydration" to setOf(HC + "READ_HYDRATION"), "add_hydration" to setOf(HC + "WRITE_HYDRATION"),
+            "get_sleep" to setOf(HC + "READ_SLEEP"), "add_sleep" to setOf(HC + "WRITE_SLEEP"),
+            "get_workouts" to setOf(HC + "READ_EXERCISE"), "add_workout" to setOf(HC + "WRITE_EXERCISE"),
+            "get_heart_rate" to setOf(HC + "READ_HEART_RATE"),
+            "get_active_calories" to setOf(HC + "READ_ACTIVE_CALORIES_BURNED"),
+            "get_body_measurements" to setOf(HC + "READ_BODY_FAT", HC + "READ_LEAN_BODY_MASS"),
+            "add_body_measurement" to setOf(HC + "WRITE_BODY_FAT", HC + "WRITE_LEAN_BODY_MASS"),
+        )
+        /** Summary and freshness have no single Health Connect permission; each section is checked on its own. */
+        private val gated = healthPermissions.keys + setOf("get_daily_summary", "get_data_freshness")
+        private fun healthPermissionsFor(operation: String) = healthPermissions.getValue(operation)
+        private val freshnessTypes = mapOf(
+            "nutrition" to ClientPermission.NUTRITION_READ, "weight" to ClientPermission.WEIGHT_READ, "steps" to ClientPermission.STEPS_READ,
+            "hydration" to ClientPermission.HYDRATION_READ, "sleep" to ClientPermission.SLEEP_READ,
+            "workouts" to ClientPermission.WORKOUTS_READ, "heart_rate" to ClientPermission.HEART_RATE_READ,
+            "active_calories" to ClientPermission.ACTIVE_CALORIES_READ, "body" to ClientPermission.BODY_READ,
         )
     }
 }

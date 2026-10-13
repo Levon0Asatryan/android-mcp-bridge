@@ -2,6 +2,31 @@ import { describe, expect, it } from "vitest";
 import { configuredOrigin } from "../src/index";
 import { routeAction, statusFor, TOKEN_PATTERN, validateArguments, withinOutputBudget } from "../src/protocol";
 
+describe("extended operations", () => {
+  const meal = { meal_name: "Chicken", meal_type: "lunch", timestamp: "2030-01-01T12:00:00+04:00", calories_kcal: 300, protein_g: 40, carbs_g: 0, fat_g: 8 };
+  it("validates batches, updates and new writes", () => {
+    expect(validateArguments("add_nutrition_batch", { entries: [{ ...meal, idempotency_key: "a" }, { ...meal, idempotency_key: "b" }] })).toBeNull();
+    expect(validateArguments("add_nutrition_batch", { entries: [{ ...meal, idempotency_key: "a" }, { ...meal, idempotency_key: "a" }] })).not.toBeNull();
+    expect(validateArguments("add_nutrition_batch", { entries: [] })).not.toBeNull();
+    expect(validateArguments("add_nutrition_batch", { entries: Array.from({ length: 21 }, (_, i) => ({ ...meal, idempotency_key: `k${i}` })) })).not.toBeNull();
+    expect(validateArguments("update_nutrition", { record_id: "r", changes: { calories_kcal: 410 } })).toBeNull();
+    expect(validateArguments("update_nutrition", { record_id: "r", changes: {} })).not.toBeNull();
+    expect(validateArguments("update_nutrition", { record_id: "r", changes: { idempotency_key: "x" } })).not.toBeNull();
+    expect(validateArguments("add_hydration", { volume_ml: 250, timestamp: meal.timestamp, idempotency_key: "k" })).toBeNull();
+    expect(validateArguments("add_hydration", { volume_ml: 0, timestamp: meal.timestamp, idempotency_key: "k" })).not.toBeNull();
+    const span = { start_time: "2030-01-01T00:00:00Z", end_time: "2030-01-01T08:00:00Z", idempotency_key: "k" };
+    expect(validateArguments("add_sleep", span)).toBeNull();
+    expect(validateArguments("add_sleep", { ...span, end_time: "2030-01-02T08:00:00Z" })).not.toBeNull();
+    expect(validateArguments("add_workout", { ...span, exercise_type: "running" })).toBeNull();
+    expect(validateArguments("add_workout", { ...span, exercise_type: "skydiving" })).not.toBeNull();
+    expect(validateArguments("add_body_measurement", { timestamp: meal.timestamp, body_fat_percent: 18, idempotency_key: "k" })).toBeNull();
+    expect(validateArguments("add_body_measurement", { timestamp: meal.timestamp, idempotency_key: "k" })).not.toBeNull();
+    expect(validateArguments("get_daily_summary", { date: "2030-02-28" })).toBeNull();
+    expect(validateArguments("get_daily_summary", { date: "2030-02-30" })).not.toBeNull();
+    expect(validateArguments("get_data_freshness", {})).toBeNull();
+  });
+});
+
 describe("protocol policy", () => {
   it("requires idempotency keys and exact finite fields for writes", () => {
     const weight = { weight_kg: 70, timestamp: "2030-01-01T00:00:00+04:00", idempotency_key: "k" };

@@ -665,7 +665,7 @@ export class BridgeObject extends DurableObject<Env> {
 function parseOAuthRegistration(value: unknown): OAuthRegistration | null {
   if (!isObject(value)) return null;
   const { client_id, scopes, pairing_generation, grant_version } = value;
-  if (typeof client_id !== "string" || !REGISTER_ID.test(client_id) || !Array.isArray(scopes) || scopes.length > 16 ||
+  if (typeof client_id !== "string" || !REGISTER_ID.test(client_id) || !Array.isArray(scopes) || scopes.length > 32 ||
     !scopes.every(isScope) || new Set(scopes).size !== scopes.length || !Number.isSafeInteger(pairing_generation) ||
     !Number.isSafeInteger(grant_version) || (grant_version as number) < 1) return null;
   return { client_id, scopes: scopes as Scope[], pairing_generation: pairing_generation as number, grant_version: grant_version as number };

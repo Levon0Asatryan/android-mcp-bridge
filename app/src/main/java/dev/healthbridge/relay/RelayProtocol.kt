@@ -14,7 +14,7 @@ const val RELAY_PROTOCOL_VERSION = 1
 
 data class RelayCommand(val requestId: String, val expiresAt: Long, val operation: String, val clientToken: String,
                         val arguments: JsonObject, val auth: OAuthBinding? = null) {
-    val mutating get() = operation.startsWith("add_") || operation.startsWith("delete_")
+    val mutating get() = operation.startsWith("add_") || operation.startsWith("update_") || operation.startsWith("delete_")
 }
 
 /** Strict validation of backend messages. Anything unexpected is rejected rather than interpreted. */

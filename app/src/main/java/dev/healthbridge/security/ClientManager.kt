@@ -12,7 +12,13 @@ import java.util.UUID
 enum class ClientPermission(val label: String, val scope: String) {
     NUTRITION_READ("Nutrition read", "nutrition.read"), NUTRITION_WRITE("Nutrition write", "nutrition.write"),
     WEIGHT_READ("Weight read", "weight.read"), WEIGHT_WRITE("Weight write", "weight.write"), STEPS_READ("Steps read", "steps.read"),
-    NUTRITION_DELETE("Delete own nutrition", "nutrition.delete"), WEIGHT_DELETE("Delete own weight", "weight.delete")
+    NUTRITION_DELETE("Delete own nutrition", "nutrition.delete"), WEIGHT_DELETE("Delete own weight", "weight.delete"),
+    HYDRATION_READ("Water read", "hydration.read"), HYDRATION_WRITE("Water write", "hydration.write"),
+    SLEEP_READ("Sleep read", "sleep.read"), SLEEP_WRITE("Sleep write", "sleep.write"),
+    WORKOUTS_READ("Workouts read", "workouts.read"), WORKOUTS_WRITE("Workouts write", "workouts.write"),
+    HEART_RATE_READ("Heart rate read", "heart_rate.read"), ACTIVE_CALORIES_READ("Active calories read", "active_calories.read"),
+    BODY_READ("Body measurements read", "body.read"), BODY_WRITE("Body measurements write", "body.write"),
+    SUMMARY_READ("Daily summary and data freshness", "summary.read")
 }
 /** OAuth scope for status and permission checks; carries no health data. */
 const val STATUS_SCOPE = "bridge.status"
