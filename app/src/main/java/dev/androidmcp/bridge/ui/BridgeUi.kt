@@ -69,6 +69,13 @@ fun BridgeUi(model: UiModel, permissions: () -> Unit, manageHealth: () -> Unit, 
                         }
                         NavigationRow("Health permissions",
                             if (app.health.available()) "${ui.granted} of ${dev.androidmcp.bridge.health.HealthConnectManager.permissions.size} permissions enabled" else "Health Connect unavailable", permissions)
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val notificationsOn = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+                        NavigationRow("Notifications, alarms and speech",
+                            (if (notificationsOn) "Notifications on" else "Notifications OFF - tap to enable") + ". Alarms and speech need no extra permission.") {
+                            context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName))
+                        }
                         GatewayPanel(relay, settings.paired, clients.count { it.enabled && it.verifier != null }, ui.busy, start, stop)
                         NavigationRow("Application access", "${clients.size} registered applications") { screen = 1 }
                         Text("Recent activity", style = MaterialTheme.typography.titleMedium)
