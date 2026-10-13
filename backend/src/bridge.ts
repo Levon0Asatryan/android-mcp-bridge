@@ -502,11 +502,15 @@ export class BridgeObject extends DurableObject<Env> {
     const registration = parseOAuthRegistration({ client_id: msg.client_id, scopes, pairing_generation: msg.pairing_generation, grant_version: msg.grant_version });
     const secret = typeof msg.grant_secret === "string" && TOKEN_PATTERN.test(msg.grant_secret) ? msg.grant_secret : null;
     const expiresAt = Number.isSafeInteger(msg.expires_at) ? msg.expires_at as number : 0;
-    if (!registration || !secret || registration.scopes.length === 0 || !registration.scopes.every((scope) => requested.has(scope)) ||
-      registration.pairing_generation !== this.pairingGeneration() || expiresAt <= Date.now() || expiresAt > Date.now() + GRANT_TTL_S * 1000 ||
-      typeof msg.fingerprint !== "string" || msg.fingerprint !== await sha256Hex(secret) ||
-      this.sql.exec("SELECT client_id FROM clients WHERE client_id = ? AND oauth_client IS NULL", registration.client_id).toArray().length > 0) {
-      return reply(false, "malformed");
+    const fail = (reason: string) => reply(false, reason);
+    if (!registration || registration.scopes.length === 0) return fail("bad_registration");
+    if (!secret) return fail("bad_secret");
+    if (!registration.scopes.every((scope) => requested.has(scope))) return fail("scope_mismatch");
+    if (registration.pairing_generation !== this.pairingGeneration()) return fail("pairing_generation");
+    if (expiresAt <= Date.now() || expiresAt > Date.now() + GRANT_TTL_S * 1000 + 3_600_000) return fail("bad_expiry");
+    if (typeof msg.fingerprint !== "string" || msg.fingerprint !== await sha256Hex(secret)) return fail("fingerprint");
+    if (this.sql.exec("SELECT client_id FROM clients WHERE client_id = ? AND oauth_client IS NULL", registration.client_id).toArray().length > 0) {
+      return fail("client_conflict");
     }
     const oauthClient = this.env.OAUTH_CLIENT_ID ?? "";
     if (!this.env.OAUTH_KV || request.clientId !== oauthClient) return reply(false, "not_configured");

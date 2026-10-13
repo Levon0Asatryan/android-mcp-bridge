@@ -115,6 +115,7 @@ class MainActivity : ComponentActivity() {
                     }
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                         biometricCancellation = null
+                        android.util.Log.w("HB", "auth error $errorCode $errString")
                         result(false)
                     }
                 })

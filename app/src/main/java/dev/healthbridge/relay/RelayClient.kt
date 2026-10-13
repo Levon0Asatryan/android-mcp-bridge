@@ -213,6 +213,7 @@ class RelaySession(
                         // A rejected approval leaves no usable phone grant behind.
                         val pending = linkedClient
                         linkedClient = null
+                        android.util.Log.i("HB", "link_ack ok=${message["ok"]} error=${message["error"]}")
                         if (pending != null && message["ok"]?.jsonPrimitive?.booleanOrNull != true) runCatching { clients.delete(pending) }
                     }
                     "security_events" -> {
@@ -240,9 +241,12 @@ class RelaySession(
 
     /** Owner decision on this phone (biometric/PIN in the UI). Only on approval is a phone-side grant created. */
     private suspend fun decideLink(request: LinkRequest): String {
+        android.util.Log.i("HB", "link request ${request.linkId} shown")
         val decision = linkApproval?.request(request) ?: LinkDecision(false)
+        android.util.Log.i("HB", "link decision approved=${decision.approved} scopes=${decision.scopes.size} expired=${System.currentTimeMillis() >= request.expiresAt}")
         if (!decision.approved || System.currentTimeMillis() >= request.expiresAt) return RelayProtocol.linkDenied(request)
-        val grant = runCatching { clients.createOAuthLink(request.oauthClientId, decision.scopes, pairingGeneration) }.getOrNull()
+        val grant = runCatching { clients.createOAuthLink(request.oauthClientId, decision.scopes, pairingGeneration) }
+            .onFailure { android.util.Log.e("HB", "createOAuthLink failed", it) }.getOrNull()
             ?: return RelayProtocol.linkDenied(request)
         linkedClient = grant.client.id
         return RelayProtocol.linkApproved(request, grant)
