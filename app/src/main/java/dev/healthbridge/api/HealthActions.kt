@@ -154,7 +154,8 @@ class HealthActions(
                     "health_connect_permissions" to JsonArray(health.grantedPermissions().sorted().map(::text)))
             }
             "get_nutrition", "get_weight", "get_steps", "get_hydration", "get_sleep", "get_workouts", "get_heart_rate",
-            "get_active_calories", "get_body_measurements" -> {
+            "get_active_calories", "get_body_measurements", "get_oxygen_saturation", "get_vitals", "get_activity_detail",
+            "get_mindfulness" -> {
                 require(args.keys == setOf("start_time", "end_time"))
                 val start = args.getValue("start_time").jsonPrimitive.also { require(it.isString) }.content
                 val end = args.getValue("end_time").jsonPrimitive.also { require(it.isString) }.content
@@ -168,11 +169,15 @@ class HealthActions(
                     "get_heart_rate" -> health.heartRate(start, end)
                     "get_active_calories" -> health.activeCalories(start, end)
                     "get_body_measurements" -> health.bodyMeasurements(start, end)
+                    "get_oxygen_saturation" -> health.oxygenSaturation(start, end)
+                    "get_vitals" -> health.vitals(start, end)
+                    "get_activity_detail" -> health.activityDetail(start, end)
+                    "get_mindfulness" -> health.mindfulness(start, end)
                     else -> obj("total_steps" to JsonPrimitive(health.steps(start, end)), "start_time" to text(start), "end_time" to text(end))
                 }
             }
             "add_nutrition" -> {
-                val entry = bridgeJson.decodeFromJsonElement<NutritionEntry>(args).also { it.validate() }
+                val entry = decodeNutrition(args).also { it.validate() }
                 val result = clients.writeOnce(client, operation, entry.idempotency_key,
                     bridgeJson.encodeToString(NutritionEntry.serializer(), entry.copy(idempotency_key = null)), entry.timestamp) {
                     checkLive(deadlineMillis)
@@ -227,11 +232,27 @@ class HealthActions(
                 require(args.keys == setOf("record_id", "changes"))
                 val id = args.getValue("record_id").jsonPrimitive.also { require(it.isString) }.content
                 require(id.isNotBlank() && id.length <= 200)
-                val changes = bridgeJson.decodeFromJsonElement<NutritionChanges>(args.getValue("changes").jsonObject)
+                val changes = decodeChanges(args.getValue("changes").jsonObject)
                 require(!changes.isEmpty())
                 checkLive(deadlineMillis)
                 val result = health.updateNutrition(id, changes)
                 JsonObject(bridgeJson.encodeToJsonElement(result).jsonObject + ("updated_fields" to bridgeJson.encodeToJsonElement(changes)))
+            }
+            "add_oxygen_saturation" -> {
+                val entry = bridgeJson.decodeFromJsonElement<OxygenEntry>(args).also { it.validate() }
+                writeResult(clients.writeOnce(client, operation, entry.idempotency_key,
+                    bridgeJson.encodeToString(OxygenEntry.serializer(), entry.copy(idempotency_key = null)), entry.timestamp) {
+                    checkLive(deadlineMillis)
+                    nativeWrite { health.addOxygenSaturation(entry, it) }
+                }, bridgeJson.encodeToJsonElement(entry.copy(idempotency_key = null)))
+            }
+            "add_mindfulness" -> {
+                val entry = bridgeJson.decodeFromJsonElement<MindfulnessEntry>(args).also { it.validate() }
+                writeResult(clients.writeOnce(client, operation, entry.idempotency_key,
+                    bridgeJson.encodeToString(MindfulnessEntry.serializer(), entry.copy(idempotency_key = null)), entry.start_time) {
+                    checkLive(deadlineMillis)
+                    nativeWrite { health.addMindfulness(entry, it) }
+                }, bridgeJson.encodeToJsonElement(entry.copy(idempotency_key = null)))
             }
             "add_nutrition_batch" -> addNutritionBatch(args, client, deadlineMillis)
             "get_daily_summary" -> dailySummary(args, client, deadlineMillis, auth)
@@ -255,9 +276,19 @@ class HealthActions(
         JsonObject(bridgeJson.encodeToJsonElement(result).jsonObject + ("recorded_values" to recorded))
 
     /** One result per meal. A failed meal never blocks the others; retries are safe through per-entry idempotency keys. */
+    private fun decodeNutrition(args: JsonObject): NutritionEntry {
+        val (base, extra) = splitNutrients(args)
+        return bridgeJson.decodeFromJsonElement<NutritionEntry>(base).copy(extra = extra)
+    }
+
+    private fun decodeChanges(args: JsonObject): NutritionChanges {
+        val (base, extra) = splitNutrients(args)
+        return bridgeJson.decodeFromJsonElement<NutritionChanges>(base).copy(extra = extra)
+    }
+
     private suspend fun addNutritionBatch(args: JsonObject, client: ClientEntity, deadlineMillis: Long?): JsonObject {
         require(args.keys == setOf("entries"))
-        val entries = args.getValue("entries").jsonArray.map { bridgeJson.decodeFromJsonElement<NutritionEntry>(it) }
+        val entries = args.getValue("entries").jsonArray.map { decodeNutrition(it.jsonObject) }
         require(entries.size in 1..MAX_BATCH) { "Provide 1-$MAX_BATCH entries." }
         require(entries.map { it.idempotency_key }.toSet().size == entries.size) { "Each entry needs its own idempotency_key." }
         val results = entries.mapIndexed { index, entry ->
@@ -337,6 +368,10 @@ class HealthActions(
         sections["body_measurements"] = section(ClientPermission.BODY_READ, healthPermissionsFor("get_body_measurements")) { health.bodyMeasurements(start, end) }
         sections["active_calories"] = section(ClientPermission.ACTIVE_CALORIES_READ, healthPermissionsFor("get_active_calories")) { health.activeCalories(start, end) }
         sections["heart_rate"] = section(ClientPermission.HEART_RATE_READ, healthPermissionsFor("get_heart_rate")) { health.heartRate(start, end) }
+        sections["oxygen"] = section(ClientPermission.OXYGEN_READ, healthPermissionsFor("get_oxygen_saturation")) { health.oxygenSaturation(start, end) }
+        sections["vitals"] = section(ClientPermission.VITALS_READ, healthPermissionsFor("get_vitals")) { health.vitals(start, end) }
+        sections["activity"] = section(ClientPermission.ACTIVITY_READ, healthPermissionsFor("get_activity_detail")) { health.activityDetail(start, end) }
+        sections["mindfulness"] = section(ClientPermission.MINDFULNESS_READ, healthPermissionsFor("get_mindfulness")) { health.mindfulness(start, end) }
         return JsonObject(obj("date" to text(raw), "time_zone" to text(zone.id), "start_time" to text(start), "end_time" to text(end)) + sections)
     }
 
@@ -349,7 +384,7 @@ class HealthActions(
 
     companion object {
         const val MAX_BATCH = 20
-        val DATA_TYPES = listOf("nutrition", "weight", "steps", "hydration", "sleep", "workouts", "heart_rate", "active_calories", "body_measurements")
+        val DATA_TYPES = listOf("nutrition", "weight", "steps", "hydration", "sleep", "workouts", "heart_rate", "active_calories", "body_measurements", "oxygen", "vitals", "activity", "mindfulness")
         val permissions = mapOf(
             "get_gateway_status" to null, "get_permissions" to null,
             "get_nutrition" to ClientPermission.NUTRITION_READ, "add_nutrition" to ClientPermission.NUTRITION_WRITE,
@@ -363,6 +398,9 @@ class HealthActions(
             "get_heart_rate" to ClientPermission.HEART_RATE_READ, "get_active_calories" to ClientPermission.ACTIVE_CALORIES_READ,
             "get_body_measurements" to ClientPermission.BODY_READ, "add_body_measurement" to ClientPermission.BODY_WRITE,
             "get_daily_summary" to ClientPermission.SUMMARY_READ, "get_data_freshness" to ClientPermission.SUMMARY_READ,
+            "get_oxygen_saturation" to ClientPermission.OXYGEN_READ, "add_oxygen_saturation" to ClientPermission.OXYGEN_WRITE,
+            "get_vitals" to ClientPermission.VITALS_READ, "get_activity_detail" to ClientPermission.ACTIVITY_READ,
+            "get_mindfulness" to ClientPermission.MINDFULNESS_READ, "add_mindfulness" to ClientPermission.MINDFULNESS_WRITE,
         )
         private const val HC = "android.permission.health."
         /** Any one of the listed Health Connect permissions is enough to start the operation. */
@@ -381,8 +419,13 @@ class HealthActions(
             "get_workouts" to setOf(HC + "READ_EXERCISE"), "add_workout" to setOf(HC + "WRITE_EXERCISE"),
             "get_heart_rate" to setOf(HC + "READ_HEART_RATE"),
             "get_active_calories" to setOf(HC + "READ_ACTIVE_CALORIES_BURNED"),
-            "get_body_measurements" to setOf(HC + "READ_BODY_FAT", HC + "READ_LEAN_BODY_MASS"),
-            "add_body_measurement" to setOf(HC + "WRITE_BODY_FAT", HC + "WRITE_LEAN_BODY_MASS"),
+            "get_body_measurements" to setOf(HC + "READ_BODY_FAT", HC + "READ_LEAN_BODY_MASS", HC + "READ_HEIGHT", HC + "READ_BONE_MASS", HC + "READ_BODY_WATER_MASS"),
+            "add_body_measurement" to setOf(HC + "WRITE_BODY_FAT", HC + "WRITE_LEAN_BODY_MASS", HC + "WRITE_HEIGHT", HC + "WRITE_BONE_MASS", HC + "WRITE_BODY_WATER_MASS"),
+            "get_oxygen_saturation" to setOf(HC + "READ_OXYGEN_SATURATION"), "add_oxygen_saturation" to setOf(HC + "WRITE_OXYGEN_SATURATION"),
+            "get_vitals" to setOf(HC + "READ_HEART_RATE_VARIABILITY", HC + "READ_RESPIRATORY_RATE"),
+            "get_activity_detail" to setOf(HC + "READ_DISTANCE", HC + "READ_FLOORS_CLIMBED", HC + "READ_ELEVATION_GAINED", HC + "READ_SPEED",
+                HC + "READ_TOTAL_CALORIES_BURNED", HC + "READ_BASAL_METABOLIC_RATE"),
+            "get_mindfulness" to setOf(HC + "READ_MINDFULNESS"), "add_mindfulness" to setOf(HC + "WRITE_MINDFULNESS"),
         )
         /** Summary and freshness have no single Health Connect permission; each section is checked on its own. */
         private val gated = healthPermissions.keys + setOf("get_daily_summary", "get_data_freshness")
@@ -392,6 +435,8 @@ class HealthActions(
             "hydration" to ClientPermission.HYDRATION_READ, "sleep" to ClientPermission.SLEEP_READ,
             "workouts" to ClientPermission.WORKOUTS_READ, "heart_rate" to ClientPermission.HEART_RATE_READ,
             "active_calories" to ClientPermission.ACTIVE_CALORIES_READ, "body" to ClientPermission.BODY_READ,
+            "oxygen" to ClientPermission.OXYGEN_READ, "vitals" to ClientPermission.VITALS_READ,
+            "activity" to ClientPermission.ACTIVITY_READ, "mindfulness" to ClientPermission.MINDFULNESS_READ,
         )
     }
 }

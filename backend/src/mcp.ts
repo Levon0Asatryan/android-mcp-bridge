@@ -2,7 +2,7 @@ import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { Env, McpOutcome } from "./bridge";
 import { bearerChallenge, type GrantProps } from "./oauth";
-import { EXERCISE_TYPES, LIMITS, MAX_BATCH, type Operation } from "./protocol";
+import { EXERCISE_TYPES, LIMITS, MAX_BATCH, MINDFULNESS_TYPES, NUTRIENT_KEYS, type Operation } from "./protocol";
 import { SCOPE_FOR } from "./scopes";
 
 /** Present only after the provider validated issuer, audience (this /mcp resource), expiry and client. */
@@ -15,34 +15,42 @@ const idempotency = z.string().min(1).max(128).describe("Unique key per intended
 const recordId = z.object({ record_id: z.string().min(1).max(200).describe("Exact id returned by a read or add tool.") }).strict();
 const empty = z.object({}).strict();
 const mealType = z.enum(["breakfast", "lunch", "dinner", "snack", "unknown"]);
+const nutrientShape = Object.fromEntries(NUTRIENT_KEYS.map((key) => [key, measure.nullable().optional()]));
+const nutrientChanges = Object.fromEntries(NUTRIENT_KEYS.map((key) => [key, measure]));
 const nutritionEntry = z.object({
   meal_name: z.string().min(1).max(200), meal_type: mealType, timestamp: isoTime,
   calories_kcal: measure, protein_g: measure, carbs_g: measure, fat_g: measure,
-  sugar_g: measure.nullable().optional(), fiber_g: measure.nullable().optional(), sodium_mg: measure.nullable().optional(),
-  idempotency_key: idempotency,
+  ...nutrientShape, idempotency_key: idempotency,
 }).strict();
 const nutritionChanges = z.object({
   meal_name: z.string().min(1).max(200), meal_type: mealType, timestamp: isoTime,
-  calories_kcal: measure, protein_g: measure, carbs_g: measure, fat_g: measure,
-  sugar_g: measure, fiber_g: measure, sodium_mg: measure,
+  calories_kcal: measure, protein_g: measure, carbs_g: measure, fat_g: measure, ...nutrientChanges,
 }).partial().strict();
+const positive = (max: number) => z.number().finite().gt(0).max(max).nullable().optional();
 const span = { start_time: isoTime, end_time: isoTime };
 const result = z.object({}).passthrough();
 
+/** Tool modules. Each module's tools are exposed as `<module>_<tool>`; core tools keep their `bridge_` names. */
+export const MODULES = {
+  core: { title: "Bridge", description: "Connection and permission status." },
+  health: { title: "Health", description: "Health Connect data: nutrition, body, activity, sleep, vitals, mindfulness." },
+} as const;
+export type ModuleName = keyof typeof MODULES;
+
 interface ToolSpec {
-  operation: Operation; title: string; description: string; input: z.ZodObject;
+  module?: ModuleName; operation: Operation; title: string; description: string; input: z.ZodObject;
   readOnly: boolean; destructive: boolean; idempotent: boolean;
 }
 
 const TOOLS: Record<string, ToolSpec> = {
-  get_bridge_status: { operation: "get_gateway_status", title: "Bridge status", readOnly: true, destructive: false, idempotent: true, input: empty,
+  bridge_status: { module: "core", operation: "get_gateway_status", title: "Bridge status", readOnly: true, destructive: false, idempotent: true, input: empty,
     description: "Phone bridge status: connection, Health Connect availability and app version. No health values." },
-  get_permissions: { operation: "get_permissions", title: "Health permissions", readOnly: true, destructive: false, idempotent: true, input: empty,
+  bridge_permissions: { module: "core", operation: "get_permissions", title: "Health permissions", readOnly: true, destructive: false, idempotent: true, input: empty,
     description: "Which Health Connect permissions and per-client grants are currently active on the phone." },
   get_nutrition: { operation: "get_nutrition", title: "Read nutrition", readOnly: true, destructive: false, idempotent: true, input: range,
     description: "Read nutrition records between start_time and end_time (at most 366 days)." },
   add_nutrition: { operation: "add_nutrition", title: "Add nutrition", readOnly: false, destructive: false, idempotent: true,
-    description: "Add one meal to Health Connect. Retrying with the same idempotency_key does not create a duplicate.",
+    description: "Add one meal to Health Connect. Besides calories and macros it accepts optional detail: sugar, fiber, sodium, fat types, cholesterol, minerals, vitamins and caffeine (units are in the field names). Retrying with the same idempotency_key does not create a duplicate.",
     input: nutritionEntry },
   delete_nutrition: { operation: "delete_nutrition", title: "Delete nutrition", readOnly: false, destructive: true, idempotent: false, input: recordId,
     description: "Delete one nutrition record written by Health Bridge. The owner must confirm on the phone." },
@@ -84,12 +92,29 @@ const TOOLS: Record<string, ToolSpec> = {
   get_active_calories: { operation: "get_active_calories", title: "Read active calories", readOnly: true, destructive: false, idempotent: true, input: range,
     description: "Active calories burned (kcal) between start_time and end_time, with the contributing source applications." },
   get_body_measurements: { operation: "get_body_measurements", title: "Read body measurements", readOnly: true, destructive: false, idempotent: true, input: range,
-    description: "Read body fat percentage and lean body mass records between start_time and end_time (at most 366 days)." },
+    description: "Read body composition (body fat %, lean body mass, height, bone mass, body water mass) between start_time and end_time (at most 366 days)." },
   add_body_measurement: { operation: "add_body_measurement", title: "Add body measurement", readOnly: false, destructive: false, idempotent: true,
-    description: "Log body fat percentage and/or lean body mass (kg). Health Connect has no waist circumference type, so waist cannot be stored. Retrying with the same idempotency_key does not create a duplicate.",
+    description: "Log body composition: body fat %, lean body mass, height (cm), bone mass and/or body water mass (kg). At least one value. Health Connect has no waist circumference type. Retrying with the same idempotency_key does not create a duplicate.",
     input: z.object({
-      timestamp: isoTime, body_fat_percent: z.number().finite().gt(0).max(100).nullable().optional(),
-      lean_body_mass_kg: z.number().finite().gt(0).max(1000).nullable().optional(), idempotency_key: idempotency,
+      timestamp: isoTime, body_fat_percent: positive(100), lean_body_mass_kg: positive(1000), height_cm: positive(300),
+      bone_mass_kg: positive(100), body_water_mass_kg: positive(500), idempotency_key: idempotency,
+    }).strict() },
+  get_oxygen_saturation: { operation: "get_oxygen_saturation", title: "Read blood oxygen", readOnly: true, destructive: false, idempotent: true, input: range,
+    description: "Blood oxygen (SpO2) readings with average, minimum and maximum percent between start_time and end_time (at most 366 days)." },
+  add_oxygen_saturation: { operation: "add_oxygen_saturation", title: "Add blood oxygen", readOnly: false, destructive: false, idempotent: true,
+    description: "Log one manual SpO2 reading in percent. Retrying with the same idempotency_key does not create a duplicate.",
+    input: z.object({ percent: z.number().finite().gt(0).max(100), timestamp: isoTime, idempotency_key: idempotency }).strict() },
+  get_vitals: { operation: "get_vitals", title: "Read vitals", readOnly: true, destructive: false, idempotent: true, input: range,
+    description: "Heart rate variability (RMSSD, ms) and respiratory rate (breaths/min): averages, minimum, maximum and sample count between start_time and end_time." },
+  get_activity_detail: { operation: "get_activity_detail", title: "Read activity detail", readOnly: true, destructive: false, idempotent: true, input: range,
+    description: "Distance (m), floors climbed, elevation gained (m), speed (average/max m/s), total calories and basal calories (kcal) between start_time and end_time." },
+  get_mindfulness: { operation: "get_mindfulness", title: "Read mindfulness", readOnly: true, destructive: false, idempotent: true, input: range,
+    description: "Mindfulness sessions (type, title, start, end, duration) between start_time and end_time (at most 366 days)." },
+  add_mindfulness: { operation: "add_mindfulness", title: "Add mindfulness session", readOnly: false, destructive: false, idempotent: true,
+    description: "Log one mindfulness session (at most 24 hours). Retrying with the same idempotency_key does not create a duplicate.",
+    input: z.object({
+      session_type: z.enum(MINDFULNESS_TYPES), ...span, title: z.string().min(1).max(200).nullable().optional(),
+      notes: z.string().min(1).max(1000).nullable().optional(), idempotency_key: idempotency,
     }).strict() },
   get_daily_summary: { operation: "get_daily_summary", title: "Daily health summary", readOnly: true, destructive: false, idempotent: true,
     description: "One-call summary of a calendar day in the phone's time zone: nutrition (totals per source), hydration, steps, workouts, sleep, weight, body measurements, active calories and heart rate. Sections the connection may not read are reported as not_permitted. Today is summarised up to now.",
@@ -97,6 +122,8 @@ const TOOLS: Record<string, ToolSpec> = {
   get_data_freshness: { operation: "get_data_freshness", title: "Data freshness", readOnly: true, destructive: false, idempotent: true, input: empty,
     description: "Per data type, which apps wrote data in the last 30 days and when each last wrote or synced (e.g. Samsung Health vs Health Bridge). Use it to tell missing data from data that has not synced yet." },
 };
+
+const toolName = (key: string, spec: ToolSpec) => (spec.module ?? "health") === "core" ? key : `health_${key}`;
 
 function server(env: Env, origin: string, auth: McpAuth | null): McpServer {
   const mcp = new McpServer({ name: "health-bridge", version: "1.0.0" }, { capabilities: { tools: {} } });
@@ -108,7 +135,8 @@ function server(env: Env, origin: string, auth: McpAuth | null): McpServer {
     _meta: { securitySchemes: [{ type: "noauth" }, { type: "oauth2", scopes: [] }] },
   }, async () => ({ content: [{ type: "text", text: "Health Bridge MCP endpoint is reachable." }], structuredContent: { ok: true, protocol: "mcp" } }));
 
-  for (const [name, spec] of Object.entries(TOOLS)) {
+  for (const [key, spec] of Object.entries(TOOLS)) {
+    const name = toolName(key, spec);
     const scope = SCOPE_FOR[spec.operation];
     mcp.registerTool(name, {
       title: spec.title, description: spec.description, inputSchema: spec.input, outputSchema: result,

@@ -71,3 +71,22 @@ describe("protocol policy", () => {
     expect(configuredOrigin("https://user@bridge.example.test")).toBeNull();
   });
 });
+
+describe("detail nutrients and new operations", () => {
+  const meal = { meal_name: "m", meal_type: "lunch", timestamp: "2030-01-01T12:00:00Z", calories_kcal: 1, protein_g: 1, carbs_g: 1, fat_g: 1, idempotency_key: "k" };
+  it("accepts detail nutrients and rejects bad ones", () => {
+    expect(validateArguments("add_nutrition", { ...meal, vitamin_c_mg: 30, iron_mg: null, caffeine_mg: 80 })).toBeNull();
+    expect(validateArguments("add_nutrition", { ...meal, vitamin_c_mg: -1 })).not.toBeNull();
+    expect(validateArguments("add_nutrition", { ...meal, vitamin_z_mg: 1 })).not.toBeNull();
+    expect(validateArguments("update_nutrition", { record_id: "r", changes: { zinc_mg: 5 } })).toBeNull();
+  });
+  it("validates oxygen, body composition and mindfulness", () => {
+    expect(validateArguments("add_oxygen_saturation", { percent: 97, timestamp: meal.timestamp, idempotency_key: "k" })).toBeNull();
+    expect(validateArguments("add_oxygen_saturation", { percent: 101, timestamp: meal.timestamp, idempotency_key: "k" })).not.toBeNull();
+    expect(validateArguments("add_body_measurement", { timestamp: meal.timestamp, height_cm: 180, idempotency_key: "k" })).toBeNull();
+    expect(validateArguments("add_body_measurement", { timestamp: meal.timestamp, idempotency_key: "k" })).not.toBeNull();
+    const span = { start_time: "2030-01-01T07:00:00Z", end_time: "2030-01-01T07:20:00Z", idempotency_key: "k" };
+    expect(validateArguments("add_mindfulness", { ...span, session_type: "meditation" })).toBeNull();
+    expect(validateArguments("add_mindfulness", { ...span, session_type: "nap" })).not.toBeNull();
+  });
+});

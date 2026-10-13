@@ -1,3 +1,5 @@
+@file:OptIn(androidx.health.connect.client.feature.ExperimentalMindfulnessSessionApi::class)
+
 package dev.healthbridge.health
 
 import android.content.Context
@@ -5,6 +7,20 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.aggregate.AggregationResult
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.BasalMetabolicRateRecord
+import androidx.health.connect.client.records.BodyWaterMassRecord
+import androidx.health.connect.client.records.BoneMassRecord
+import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ElevationGainedRecord
+import androidx.health.connect.client.records.FloorsClimbedRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
+import androidx.health.connect.client.records.HeightRecord
+import androidx.health.connect.client.records.MindfulnessSessionRecord
+import androidx.health.connect.client.records.OxygenSaturationRecord
+import androidx.health.connect.client.records.RespiratoryRateRecord
+import androidx.health.connect.client.records.SpeedRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
+import androidx.health.connect.client.units.Length
 import androidx.health.connect.client.records.BodyFatRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
@@ -67,7 +83,7 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
                     record.energy?.inKilocalories, record.protein?.inGrams,
                     record.totalCarbohydrate?.inGrams, record.totalFat?.inGrams,
                     record.sugar?.inGrams, record.dietaryFiber?.inGrams, record.sodium?.inMilligrams,
-                    record.metadata.dataOrigin.packageName,
+                    record.metadata.dataOrigin.packageName, nutrientsOf(record),
                 )
             }
             check(result.size <= 5000) { "Too many records. Use a smaller date range." }
@@ -97,7 +113,50 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
             protein = Mass.grams(entry.protein_g), totalCarbohydrate = Mass.grams(entry.carbs_g),
             totalFat = Mass.grams(entry.fat_g), sugar = entry.sugar_g?.let(Mass::grams),
             dietaryFiber = entry.fiber_g?.let(Mass::grams), sodium = entry.sodium_mg?.let(Mass::milligrams),
+            saturatedFat = mass(entry, "saturated_fat_g"), unsaturatedFat = mass(entry, "unsaturated_fat_g"),
+            monounsaturatedFat = mass(entry, "monounsaturated_fat_g"), polyunsaturatedFat = mass(entry, "polyunsaturated_fat_g"),
+            transFat = mass(entry, "trans_fat_g"), cholesterol = mass(entry, "cholesterol_mg"),
+            potassium = mass(entry, "potassium_mg"), calcium = mass(entry, "calcium_mg"), iron = mass(entry, "iron_mg"),
+            magnesium = mass(entry, "magnesium_mg"), zinc = mass(entry, "zinc_mg"), phosphorus = mass(entry, "phosphorus_mg"),
+            copper = mass(entry, "copper_mg"), manganese = mass(entry, "manganese_mg"), chloride = mass(entry, "chloride_mg"),
+            selenium = mass(entry, "selenium_mcg"), chromium = mass(entry, "chromium_mcg"), molybdenum = mass(entry, "molybdenum_mcg"),
+            iodine = mass(entry, "iodine_mcg"), vitaminA = mass(entry, "vitamin_a_mcg"), vitaminB6 = mass(entry, "vitamin_b6_mg"),
+            vitaminB12 = mass(entry, "vitamin_b12_mcg"), vitaminC = mass(entry, "vitamin_c_mg"), vitaminD = mass(entry, "vitamin_d_mcg"),
+            vitaminE = mass(entry, "vitamin_e_mg"), vitaminK = mass(entry, "vitamin_k_mcg"), thiamin = mass(entry, "thiamin_mg"),
+            riboflavin = mass(entry, "riboflavin_mg"), niacin = mass(entry, "niacin_mg"), folate = mass(entry, "folate_mcg"),
+            folicAcid = mass(entry, "folic_acid_mcg"), biotin = mass(entry, "biotin_mcg"),
+            pantothenicAcid = mass(entry, "pantothenic_acid_mg"), caffeine = mass(entry, "caffeine_mg"),
         )
+    }
+
+    private fun mass(entry: NutritionEntry, key: String): Mass? = entry.extra[key]?.let {
+        when {
+            key.endsWith("_mcg") -> Mass.micrograms(it)
+            key.endsWith("_mg") -> Mass.milligrams(it)
+            else -> Mass.grams(it)
+        }
+    }
+
+    private fun nutrientsOf(r: NutritionRecord): Map<String, Double> {
+        val values = mapOf(
+            "saturated_fat_g" to r.saturatedFat?.inGrams, "unsaturated_fat_g" to r.unsaturatedFat?.inGrams,
+            "monounsaturated_fat_g" to r.monounsaturatedFat?.inGrams, "polyunsaturated_fat_g" to r.polyunsaturatedFat?.inGrams,
+            "trans_fat_g" to r.transFat?.inGrams, "cholesterol_mg" to r.cholesterol?.inMilligrams,
+            "potassium_mg" to r.potassium?.inMilligrams, "calcium_mg" to r.calcium?.inMilligrams, "iron_mg" to r.iron?.inMilligrams,
+            "magnesium_mg" to r.magnesium?.inMilligrams, "zinc_mg" to r.zinc?.inMilligrams, "phosphorus_mg" to r.phosphorus?.inMilligrams,
+            "copper_mg" to r.copper?.inMilligrams, "manganese_mg" to r.manganese?.inMilligrams, "chloride_mg" to r.chloride?.inMilligrams,
+            "selenium_mcg" to r.selenium?.inMicrograms, "chromium_mcg" to r.chromium?.inMicrograms,
+            "molybdenum_mcg" to r.molybdenum?.inMicrograms, "iodine_mcg" to r.iodine?.inMicrograms,
+            "vitamin_a_mcg" to r.vitaminA?.inMicrograms, "vitamin_b6_mg" to r.vitaminB6?.inMilligrams,
+            "vitamin_b12_mcg" to r.vitaminB12?.inMicrograms, "vitamin_c_mg" to r.vitaminC?.inMilligrams,
+            "vitamin_d_mcg" to r.vitaminD?.inMicrograms, "vitamin_e_mg" to r.vitaminE?.inMilligrams,
+            "vitamin_k_mcg" to r.vitaminK?.inMicrograms, "thiamin_mg" to r.thiamin?.inMilligrams,
+            "riboflavin_mg" to r.riboflavin?.inMilligrams, "niacin_mg" to r.niacin?.inMilligrams,
+            "folate_mcg" to r.folate?.inMicrograms, "folic_acid_mcg" to r.folicAcid?.inMicrograms,
+            "biotin_mcg" to r.biotin?.inMicrograms, "pantothenic_acid_mg" to r.pantothenicAcid?.inMilligrams,
+            "caffeine_mg" to r.caffeine?.inMilligrams,
+        )
+        return values.mapNotNull { (key, value) -> value?.let { key to it } }.toMap()
     }
 
     /** Rewrites a HealthBridge-owned meal in place: same client record id, higher version, so no duplicate appears. */
@@ -123,6 +182,7 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
             sugar_g = changes.sugar_g ?: old.sugar?.inGrams,
             fiber_g = changes.fiber_g ?: old.dietaryFiber?.inGrams,
             sodium_mg = changes.sodium_mg ?: old.sodium?.inMilligrams,
+            extra = nutrientsOf(old) + changes.extra,
         )
         merged.validate()
         val offset = changes.timestamp?.let { parseTime(it).offset } ?: oldOffset
@@ -276,7 +336,10 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
         val granted = grantedPermissions()
         val fatOk = HealthPermission.getReadPermission(BodyFatRecord::class) in granted
         val leanOk = HealthPermission.getReadPermission(LeanBodyMassRecord::class) in granted
-        if (!fatOk && !leanOk) throw SecurityException("Required Health Connect permission is not granted.")
+        val heightOk = HealthPermission.getReadPermission(HeightRecord::class) in granted
+        val boneOk = HealthPermission.getReadPermission(BoneMassRecord::class) in granted
+        val waterOk = HealthPermission.getReadPermission(BodyWaterMassRecord::class) in granted
+        if (!fatOk && !leanOk && !heightOk && !boneOk && !waterOk) throw SecurityException("Required Health Connect permission is not granted.")
         check(available()) { "Health Connect is unavailable. Install or update Health Connect." }
         val (from, to) = dateRange(start, end)
         return buildJsonObject {
@@ -292,6 +355,24 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
                     put("source_application", r.metadata.dataOrigin.packageName)
                 }) }
             })
+            put("height", if (!heightOk) JsonNull else buildJsonArray {
+                readAll(HeightRecord::class, from, to).forEach { r -> add(buildJsonObject {
+                    put("id", r.metadata.id); put("cm", r.height.inMeters * 100); put("timestamp", offsetOf(r.time, r.zoneOffset))
+                    put("source_application", r.metadata.dataOrigin.packageName)
+                }) }
+            })
+            put("bone_mass", if (!boneOk) JsonNull else buildJsonArray {
+                readAll(BoneMassRecord::class, from, to).forEach { r -> add(buildJsonObject {
+                    put("id", r.metadata.id); put("kg", r.mass.inKilograms); put("timestamp", offsetOf(r.time, r.zoneOffset))
+                    put("source_application", r.metadata.dataOrigin.packageName)
+                }) }
+            })
+            put("body_water_mass", if (!waterOk) JsonNull else buildJsonArray {
+                readAll(BodyWaterMassRecord::class, from, to).forEach { r -> add(buildJsonObject {
+                    put("id", r.metadata.id); put("kg", r.mass.inKilograms); put("timestamp", offsetOf(r.time, r.zoneOffset))
+                    put("source_application", r.metadata.dataOrigin.packageName)
+                }) }
+            })
         }
     }
 
@@ -299,7 +380,10 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
         entry.validate()
         val granted = grantedPermissions()
         if (entry.body_fat_percent != null && HealthPermission.getWritePermission(BodyFatRecord::class) !in granted ||
-            entry.lean_body_mass_kg != null && HealthPermission.getWritePermission(LeanBodyMassRecord::class) !in granted)
+            entry.lean_body_mass_kg != null && HealthPermission.getWritePermission(LeanBodyMassRecord::class) !in granted ||
+            entry.height_cm != null && HealthPermission.getWritePermission(HeightRecord::class) !in granted ||
+            entry.bone_mass_kg != null && HealthPermission.getWritePermission(BoneMassRecord::class) !in granted ||
+            entry.body_water_mass_kg != null && HealthPermission.getWritePermission(BodyWaterMassRecord::class) !in granted)
             throw SecurityException("Required Health Connect permission is not granted.")
         check(available()) { "Health Connect is unavailable. Install or update Health Connect." }
         val time = parseTime(entry.timestamp)
@@ -312,8 +396,145 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
             records += LeanBodyMassRecord(time.toInstant(), time.offset, Mass.kilograms(it),
                 Metadata.manualEntry(clientRecordId = "$recordKey:lean", clientRecordVersion = 1))
         }
+        entry.height_cm?.let {
+            records += HeightRecord(time.toInstant(), time.offset, Length.meters(it / 100),
+                Metadata.manualEntry(clientRecordId = "$recordKey:height", clientRecordVersion = 1))
+        }
+        entry.bone_mass_kg?.let {
+            records += BoneMassRecord(time.toInstant(), time.offset, Mass.kilograms(it),
+                Metadata.manualEntry(clientRecordId = "$recordKey:bone", clientRecordVersion = 1))
+        }
+        entry.body_water_mass_kg?.let {
+            records += BodyWaterMassRecord(time.toInstant(), time.offset, Mass.kilograms(it),
+                Metadata.manualEntry(clientRecordId = "$recordKey:water", clientRecordVersion = 1))
+        }
         checkHealthOperation()
         return WriteResult(record_id = client.insertRecords(records).recordIdsList.joinToString(","), timestamp = entry.timestamp)
+    }
+
+    override suspend fun oxygenSaturation(start: String, end: String): JsonObject {
+        check(HealthPermission.getReadPermission(OxygenSaturationRecord::class))
+        val (from, to) = dateRange(start, end)
+        val records = readAll(OxygenSaturationRecord::class, from, to)
+        val values = records.map { it.percentage.value }
+        return buildJsonObject {
+            put("count", records.size)
+            put("average_percent", if (values.isEmpty()) null else values.average())
+            put("min_percent", values.minOrNull()); put("max_percent", values.maxOrNull())
+            put("records", buildJsonArray {
+                records.forEach { r -> add(buildJsonObject {
+                    put("id", r.metadata.id); put("percent", r.percentage.value); put("timestamp", offsetOf(r.time, r.zoneOffset))
+                    put("source_application", r.metadata.dataOrigin.packageName)
+                }) }
+            })
+        }
+    }
+
+    override suspend fun addOxygenSaturation(entry: OxygenEntry, recordKey: String): WriteResult {
+        entry.validate()
+        check(HealthPermission.getWritePermission(OxygenSaturationRecord::class))
+        val time = parseTime(entry.timestamp)
+        val record = OxygenSaturationRecord(time.toInstant(), time.offset, Percentage(entry.percent),
+            Metadata.manualEntry(clientRecordId = recordKey, clientRecordVersion = 1))
+        checkHealthOperation()
+        return WriteResult(record_id = client.insertRecords(listOf(record)).recordIdsList.single(), timestamp = entry.timestamp)
+    }
+
+    override suspend fun vitals(start: String, end: String): JsonObject {
+        val granted = grantedPermissions()
+        val hrvOk = HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class) in granted
+        val respOk = HealthPermission.getReadPermission(RespiratoryRateRecord::class) in granted
+        if (!hrvOk && !respOk) throw SecurityException("Required Health Connect permission is not granted.")
+        check(available()) { "Health Connect is unavailable. Install or update Health Connect." }
+        val (from, to) = dateRange(start, end)
+        fun stats(values: List<Double>) = buildJsonObject {
+            put("count", values.size); put("average", if (values.isEmpty()) null else values.average())
+            put("min", values.minOrNull()); put("max", values.maxOrNull())
+        }
+        return buildJsonObject {
+            put("heart_rate_variability_rmssd_ms", if (!hrvOk) JsonNull else
+                stats(readAll(HeartRateVariabilityRmssdRecord::class, from, to).map { it.heartRateVariabilityMillis }))
+            put("respiratory_rate_per_min", if (!respOk) JsonNull else
+                stats(readAll(RespiratoryRateRecord::class, from, to).map { it.rate }))
+        }
+    }
+
+    override suspend fun activityDetail(start: String, end: String): JsonObject {
+        val granted = grantedPermissions()
+        fun ok(type: KClass<out Record>) = HealthPermission.getReadPermission(type) in granted
+        val distance = ok(DistanceRecord::class); val floors = ok(FloorsClimbedRecord::class)
+        val elevation = ok(ElevationGainedRecord::class); val speed = ok(SpeedRecord::class)
+        val total = ok(TotalCaloriesBurnedRecord::class); val basal = ok(BasalMetabolicRateRecord::class)
+        if (!distance && !floors && !elevation && !speed && !total && !basal) throw SecurityException("Required Health Connect permission is not granted.")
+        check(available()) { "Health Connect is unavailable. Install or update Health Connect." }
+        val (from, to) = dateRange(start, end)
+        val metrics = buildSet<androidx.health.connect.client.aggregate.AggregateMetric<*>> {
+            if (distance) add(DistanceRecord.DISTANCE_TOTAL)
+            if (floors) add(FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL)
+            if (elevation) add(ElevationGainedRecord.ELEVATION_GAINED_TOTAL)
+            if (speed) { add(SpeedRecord.SPEED_AVG); add(SpeedRecord.SPEED_MAX) }
+            if (total) add(TotalCaloriesBurnedRecord.ENERGY_TOTAL)
+            if (basal) add(BasalMetabolicRateRecord.BASAL_CALORIES_TOTAL)
+        }
+        val result = aggregate(metrics, from, to)
+        return buildJsonObject {
+            put("distance_m", if (distance) result[DistanceRecord.DISTANCE_TOTAL]?.inMeters ?: 0.0 else null)
+            put("floors_climbed", if (floors) result[FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL] ?: 0.0 else null)
+            put("elevation_gained_m", if (elevation) result[ElevationGainedRecord.ELEVATION_GAINED_TOTAL]?.inMeters ?: 0.0 else null)
+            put("speed_avg_mps", if (speed) result[SpeedRecord.SPEED_AVG]?.inMetersPerSecond else null)
+            put("speed_max_mps", if (speed) result[SpeedRecord.SPEED_MAX]?.inMetersPerSecond else null)
+            put("total_calories_kcal", if (total) result[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories else null)
+            put("basal_calories_kcal", if (basal) result[BasalMetabolicRateRecord.BASAL_CALORIES_TOTAL]?.inKilocalories else null)
+            put("sources", sources(result))
+        }
+    }
+
+    override suspend fun mindfulness(start: String, end: String): JsonObject {
+        check(HealthPermission.getReadPermission(MindfulnessSessionRecord::class))
+        val (from, to) = dateRange(start, end)
+        val records = readAll(MindfulnessSessionRecord::class, from, to)
+        return buildJsonObject {
+            put("total_minutes", records.sumOf { Duration.between(it.startTime, it.endTime).toMinutes() })
+            put("records", buildJsonArray {
+                records.forEach { r -> add(buildJsonObject {
+                    put("id", r.metadata.id); put("session_type", mindfulnessName(r.mindfulnessSessionType))
+                    put("title", r.title); put("notes", r.notes)
+                    put("start_time", offsetOf(r.startTime, r.startZoneOffset)); put("end_time", offsetOf(r.endTime, r.endZoneOffset))
+                    put("duration_minutes", Duration.between(r.startTime, r.endTime).toMinutes())
+                    put("source_application", r.metadata.dataOrigin.packageName)
+                }) }
+            })
+        }
+    }
+
+    override suspend fun addMindfulness(entry: MindfulnessEntry, recordKey: String): WriteResult {
+        entry.validate()
+        check(HealthPermission.getWritePermission(MindfulnessSessionRecord::class))
+        val start = parseTime(entry.start_time)
+        val end = parseTime(entry.end_time)
+        val record = MindfulnessSessionRecord(start.toInstant(), start.offset, end.toInstant(), end.offset,
+            Metadata.manualEntry(clientRecordId = recordKey, clientRecordVersion = 1), mindfulnessType(entry.session_type),
+            entry.title, entry.notes)
+        checkHealthOperation()
+        return WriteResult(record_id = client.insertRecords(listOf(record)).recordIdsList.single(), timestamp = entry.start_time)
+    }
+
+    private fun mindfulnessType(name: String) = when (name) {
+        "meditation" -> MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_MEDITATION
+        "breathing" -> MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_BREATHING
+        "music" -> MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_MUSIC
+        "movement" -> MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_MOVEMENT
+        "unguided" -> MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_UNGUIDED
+        else -> MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_UNKNOWN
+    }
+
+    private fun mindfulnessName(type: Int) = when (type) {
+        MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_MEDITATION -> "meditation"
+        MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_BREATHING -> "breathing"
+        MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_MUSIC -> "music"
+        MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_MOVEMENT -> "movement"
+        MindfulnessSessionRecord.MINDFULNESS_SESSION_TYPE_UNGUIDED -> "unguided"
+        else -> "other"
     }
 
     override suspend fun freshness(types: Set<String>): JsonObject {
@@ -341,7 +562,12 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
             "hydration" to listOf(HydrationRecord::class), "sleep" to listOf(SleepSessionRecord::class),
             "workouts" to listOf(ExerciseSessionRecord::class), "heart_rate" to listOf(HeartRateRecord::class),
             "active_calories" to listOf(ActiveCaloriesBurnedRecord::class),
-            "body" to listOf(BodyFatRecord::class, LeanBodyMassRecord::class),
+            "body" to listOf(BodyFatRecord::class, LeanBodyMassRecord::class, HeightRecord::class, BoneMassRecord::class, BodyWaterMassRecord::class),
+            "oxygen" to listOf(OxygenSaturationRecord::class),
+            "vitals" to listOf(HeartRateVariabilityRmssdRecord::class, RespiratoryRateRecord::class),
+            "activity" to listOf(DistanceRecord::class, FloorsClimbedRecord::class, ElevationGainedRecord::class, SpeedRecord::class,
+                TotalCaloriesBurnedRecord::class, BasalMetabolicRateRecord::class),
+            "mindfulness" to listOf(MindfulnessSessionRecord::class),
         )
         return buildJsonObject {
             put("window_days", 30)
@@ -369,6 +595,17 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
         is WeightRecord -> record.time
         is BodyFatRecord -> record.time
         is LeanBodyMassRecord -> record.time
+        is HeightRecord -> record.time
+        is BoneMassRecord -> record.time
+        is BodyWaterMassRecord -> record.time
+        is OxygenSaturationRecord -> record.time
+        is HeartRateVariabilityRmssdRecord -> record.time
+        is RespiratoryRateRecord -> record.time
+        is DistanceRecord -> record.endTime
+        is FloorsClimbedRecord -> record.endTime
+        is ElevationGainedRecord -> record.endTime
+        is TotalCaloriesBurnedRecord -> record.endTime
+        is MindfulnessSessionRecord -> record.endTime
         else -> record.metadata.lastModifiedTime
     }
 
@@ -467,6 +704,24 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
             HealthPermission.getWritePermission(BodyFatRecord::class),
             HealthPermission.getReadPermission(LeanBodyMassRecord::class),
             HealthPermission.getWritePermission(LeanBodyMassRecord::class),
+            HealthPermission.getReadPermission(HeightRecord::class),
+            HealthPermission.getWritePermission(HeightRecord::class),
+            HealthPermission.getReadPermission(BoneMassRecord::class),
+            HealthPermission.getWritePermission(BoneMassRecord::class),
+            HealthPermission.getReadPermission(BodyWaterMassRecord::class),
+            HealthPermission.getWritePermission(BodyWaterMassRecord::class),
+            HealthPermission.getReadPermission(OxygenSaturationRecord::class),
+            HealthPermission.getWritePermission(OxygenSaturationRecord::class),
+            HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+            HealthPermission.getReadPermission(RespiratoryRateRecord::class),
+            HealthPermission.getReadPermission(DistanceRecord::class),
+            HealthPermission.getReadPermission(FloorsClimbedRecord::class),
+            HealthPermission.getReadPermission(ElevationGainedRecord::class),
+            HealthPermission.getReadPermission(SpeedRecord::class),
+            HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
+            HealthPermission.getReadPermission(BasalMetabolicRateRecord::class),
+            HealthPermission.getReadPermission(MindfulnessSessionRecord::class),
+            HealthPermission.getWritePermission(MindfulnessSessionRecord::class),
             HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY,
         )
         private val exerciseTypes = mapOf(

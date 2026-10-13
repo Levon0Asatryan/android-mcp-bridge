@@ -211,7 +211,20 @@ open it and grant the new Health Connect permissions, redeploy the backend
 (`cd backend && npm run deploy`), then remove and re-add the ChatGPT plugin so
 the new scopes are requested and approved on the phone.
 
-## 10. Known gaps
+## 10. Detail data, modules and approvals
+
+- **Approvals tab** lists the pending ChatGPT link and deletion requests with Approve/Deny. The backend replays pending links to a phone that reconnects.
+- **Clock skew fix.** The phone's grant expiry could exceed the worker's maximum by a few seconds, so `link_result` failed as "malformed". The backend now allows 1 hour of slack and reports a specific reason.
+- **Removed** manual meal import.
+- **Nutrition detail:** 34 optional fields (fat types, cholesterol, 13 minerals, 14 vitamins, caffeine). Units are in the field names. Reads return them under `nutrients`; update merges them with the old record.
+- **New tools:** `get/add_oxygen_saturation`, `get_vitals` (HRV, respiratory rate), `get_activity_detail` (distance, floors, elevation, speed, total and basal calories), `get/add_mindfulness`. Body measurements also cover height, bone mass and body water mass. Daily summary and freshness include the new types.
+- **New scopes:** `oxygen.read|write`, `vitals.read`, `activity.read`, `mindfulness.read|write`.
+- **Modules:** MCP tools are now `health_<tool>`; core tools are `bridge_status`, `bridge_permissions`, `bridge_connection_check`. See `docs/mcp-bridge-plan.md`.
+- Not added: blood pressure, glucose, temperature, cycle tracking (no devices or not wanted); stress and waist are not in Health Connect.
+
+**After updating:** redeploy, reinstall, grant the new Health Connect permissions, tap Start in the gateway panel, then delete and re-create the ChatGPT connector (new tool names and scopes).
+
+## 11. Known gaps
 
 - No waist circumference (not in Health Connect 1.1.0).
 - New tools are MCP-only; the legacy Actions API is unchanged.

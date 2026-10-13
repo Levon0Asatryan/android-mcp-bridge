@@ -131,16 +131,19 @@ describe("MCP endpoint", () => {
     const client = await mcpClient();
     const tools = (await client.listTools()).tools;
     expect(tools.map((t) => t.name).sort()).toEqual([
-      "add_body_measurement", "add_hydration", "add_nutrition", "add_nutrition_batch", "add_sleep", "add_weight", "add_workout",
-      "bridge_connection_check", "delete_nutrition", "delete_weight", "get_active_calories", "get_body_measurements",
-      "get_bridge_status", "get_daily_summary", "get_data_freshness", "get_heart_rate", "get_hydration", "get_nutrition",
-      "get_permissions", "get_sleep", "get_steps", "get_weight", "get_workouts", "update_nutrition"]);
-    const del = tools.find((t) => t.name === "delete_weight");
+      "bridge_connection_check", "bridge_permissions", "bridge_status",
+      ...["add_body_measurement", "add_hydration", "add_mindfulness", "add_nutrition", "add_nutrition_batch", "add_oxygen_saturation",
+        "add_sleep", "add_weight", "add_workout", "delete_nutrition", "delete_weight", "get_active_calories", "get_activity_detail",
+        "get_body_measurements", "get_daily_summary", "get_data_freshness", "get_heart_rate", "get_hydration", "get_mindfulness",
+        "get_nutrition", "get_oxygen_saturation", "get_sleep", "get_steps", "get_vitals", "get_weight", "get_workouts",
+        "update_nutrition"].map((name) => `health_${name}`),
+    ].sort());
+    const del = tools.find((t) => t.name === "health_delete_weight");
     expect(del?.annotations).toMatchObject({ destructiveHint: true, readOnlyHint: false });
-    expect(tools.find((t) => t.name === "get_steps")?.annotations).toMatchObject({ readOnlyHint: true });
+    expect(tools.find((t) => t.name === "health_get_steps")?.annotations).toMatchObject({ readOnlyHint: true });
     const check = await client.callTool({ name: "bridge_connection_check", arguments: {} });
     expect(check.structuredContent).toEqual({ ok: true, protocol: "mcp" });
-    const health = await client.callTool({ name: "get_bridge_status", arguments: {} });
+    const health = await client.callTool({ name: "bridge_status", arguments: {} });
     expect(health.isError).toBe(true);
     expect(JSON.stringify(health._meta)).toContain("resource_metadata=");
     await client.close();
@@ -237,7 +240,7 @@ describe("OAuth authorization", () => {
     Object.assign(next, await second.json<{ refresh_token: string; access_token: string }>());
     expect((await token({ grant_type: "refresh_token", refresh_token: tokens.refresh_token })).status).toBe(400);
     const client = await mcpClient(next.access_token);
-    const status = client.callTool({ name: "get_bridge_status", arguments: {} });
+    const status = client.callTool({ name: "bridge_status", arguments: {} });
     const command = await phone.next("command");
     expect(command.client_token).toBe(secret);
     phone.reply(command, { running: true });
@@ -248,7 +251,7 @@ describe("OAuth authorization", () => {
     }
     phone.send({ type: "register_clients", version: 1, request_id: "keep", clients: [] });
     await phone.next("ack");
-    const revoked = await client.callTool({ name: "get_bridge_status", arguments: {} }).catch((e: Error) => e);
+    const revoked = await client.callTool({ name: "bridge_status", arguments: {} }).catch((e: Error) => e);
     expect(revoked instanceof Error || (revoked as { isError?: boolean }).isError).toBeTruthy();
     expect((await token({ grant_type: "refresh_token", refresh_token: next.refresh_token })).status).toBe(400);
   });
@@ -276,16 +279,16 @@ describe("OAuth health tools", () => {
   it("relays scoped calls with the phone-held grant and an auth envelope, and enforces scopes", async () => {
     const { tokens, phone, secret, clientId } = await linked(["bridge.status", "nutrition.read"]);
     const client = await mcpClient(tokens.access_token);
-    const pending = client.callTool({ name: "get_nutrition", arguments: { start_time: "2030-01-01T00:00:00Z", end_time: "2030-01-02T00:00:00Z" } });
+    const pending = client.callTool({ name: "health_get_nutrition", arguments: { start_time: "2030-01-01T00:00:00Z", end_time: "2030-01-02T00:00:00Z" } });
     const command = await phone.next("command");
     expect(command).toMatchObject({ operation: "get_nutrition", client_token: secret,
       auth: { kind: "oauth", oauth_client_id: CLIENT_ID, client_id: clientId, grant_version: 1, pairing_generation: 1 } });
     phone.reply(command, { success: true, records: [] });
     expect((await pending).structuredContent).toEqual({ success: true, records: [] });
-    const denied = await client.callTool({ name: "delete_nutrition", arguments: { record_id: "r1" } });
+    const denied = await client.callTool({ name: "health_delete_nutrition", arguments: { record_id: "r1" } });
     expect(denied.isError).toBe(true);
     expect(JSON.stringify(denied._meta)).toContain("insufficient_scope");
-    const invalid = await client.callTool({ name: "get_nutrition", arguments: { start_time: "x", end_time: "y", extra: 1 } }).catch((e: Error) => e);
+    const invalid = await client.callTool({ name: "health_get_nutrition", arguments: { start_time: "x", end_time: "y", extra: 1 } }).catch((e: Error) => e);
     expect(invalid instanceof Error || (invalid as { isError?: boolean }).isError).toBeTruthy();
     expect(phone.count("command")).toBe(1);
     // The Actions path never accepts an OAuth grant secret.

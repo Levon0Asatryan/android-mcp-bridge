@@ -27,6 +27,13 @@ interface HealthRepository {
     suspend fun bodyMeasurements(start: String, end: String): JsonObject = unsupported()
     suspend fun addBodyMeasurement(entry: BodyMeasurementEntry, recordKey: String): WriteResult = unsupported()
 
+    suspend fun oxygenSaturation(start: String, end: String): JsonObject = unsupported()
+    suspend fun addOxygenSaturation(entry: OxygenEntry, recordKey: String): WriteResult = unsupported()
+    suspend fun vitals(start: String, end: String): JsonObject = unsupported()
+    suspend fun activityDetail(start: String, end: String): JsonObject = unsupported()
+    suspend fun mindfulness(start: String, end: String): JsonObject = unsupported()
+    suspend fun addMindfulness(entry: MindfulnessEntry, recordKey: String): WriteResult = unsupported()
+
     /** Latest writer activity per data type over the last 30 days, limited to [types] the caller may see. */
     suspend fun freshness(types: Set<String>): JsonObject = unsupported()
 }

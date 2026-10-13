@@ -1,10 +1,37 @@
 package dev.healthbridge.health
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeParseException
+
+/** Detail nutrients beyond calories/protein/carbs/fat; the unit is part of the key (_g, _mg, _mcg). */
+val DETAIL_NUTRIENTS = listOf(
+    "saturated_fat_g", "unsaturated_fat_g", "monounsaturated_fat_g", "polyunsaturated_fat_g", "trans_fat_g", "cholesterol_mg",
+    "potassium_mg", "calcium_mg", "iron_mg", "magnesium_mg", "zinc_mg", "phosphorus_mg", "copper_mg", "manganese_mg", "chloride_mg",
+    "selenium_mcg", "chromium_mcg", "molybdenum_mcg", "iodine_mcg",
+    "vitamin_a_mcg", "vitamin_b6_mg", "vitamin_b12_mcg", "vitamin_c_mg", "vitamin_d_mcg", "vitamin_e_mg", "vitamin_k_mcg",
+    "thiamin_mg", "riboflavin_mg", "niacin_mg", "folate_mcg", "folic_acid_mcg", "biotin_mcg", "pantothenic_acid_mg", "caffeine_mg",
+)
+private val DETAIL_SET = DETAIL_NUTRIENTS.toSet()
+
+fun validateNutrients(values: Map<String, Double>) = values.forEach { (key, value) ->
+    require(key in DETAIL_SET) { "Unsupported nutrient $key." }
+    require(value.isFinite() && value in 0.0..100000.0) { "$key must be 0-100000." }
+}
+
+/** Moves flat nutrient keys of a tool call into `extra` so they decode into the typed models. */
+fun splitNutrients(args: JsonObject): Pair<JsonObject, Map<String, Double>> {
+    val extra = args.filterKeys { it in DETAIL_SET }.mapNotNull { (key, value) ->
+        (value as? JsonPrimitive)?.takeIf { it !is JsonNull }?.let { key to (it.doubleOrNull ?: throw IllegalArgumentException("$key must be a number.")) }
+    }.toMap()
+    return JsonObject(args.filterKeys { it !in DETAIL_SET }) to extra
+}
 
 @Serializable
 data class NutritionEntry(
@@ -19,8 +46,10 @@ data class NutritionEntry(
     val fiber_g: Double? = null,
     val sodium_mg: Double? = null,
     val idempotency_key: String? = null,
+    val extra: Map<String, Double> = emptyMap(),
 ) {
     fun validate() {
+        validateNutrients(extra)
         require(meal_name.isNotBlank() && meal_name.length <= 200) { "Meal name must contain 1-200 characters." }
         require(meal_type in setOf("breakfast", "lunch", "dinner", "snack", "unknown")) { "Unsupported meal type." }
         parseTime(timestamp)
@@ -59,8 +88,9 @@ data class NutritionChanges(
     val meal_name: String? = null, val meal_type: String? = null, val timestamp: String? = null,
     val calories_kcal: Double? = null, val protein_g: Double? = null, val carbs_g: Double? = null, val fat_g: Double? = null,
     val sugar_g: Double? = null, val fiber_g: Double? = null, val sodium_mg: Double? = null,
+    val extra: Map<String, Double> = emptyMap(),
 ) {
-    fun isEmpty() = listOf(meal_name, meal_type, timestamp, calories_kcal, protein_g, carbs_g, fat_g, sugar_g, fiber_g, sodium_mg).all { it == null }
+    fun isEmpty() = extra.isEmpty() && listOf(meal_name, meal_type, timestamp, calories_kcal, protein_g, carbs_g, fat_g, sugar_g, fiber_g, sodium_mg).all { it == null }
 }
 
 @Serializable
@@ -99,12 +129,43 @@ data class WorkoutEntry(
 data class BodyMeasurementEntry(
     val timestamp: String, val body_fat_percent: Double? = null, val lean_body_mass_kg: Double? = null,
     val idempotency_key: String? = null,
+    val height_cm: Double? = null, val bone_mass_kg: Double? = null, val body_water_mass_kg: Double? = null,
 ) {
     fun validate() {
-        require(body_fat_percent != null || lean_body_mass_kg != null) { "Provide body fat or lean body mass." }
+        require(listOf(body_fat_percent, lean_body_mass_kg, height_cm, bone_mass_kg, body_water_mass_kg).any { it != null }) {
+            "Provide at least one body composition value."
+        }
         body_fat_percent?.let { require(it.isFinite() && it > 0 && it <= 100) { "Body fat must be greater than 0 and at most 100." } }
         lean_body_mass_kg?.let { require(it.isFinite() && it > 0 && it <= 1000) { "Lean body mass must be greater than 0 and at most 1000 kg." } }
+        height_cm?.let { require(it.isFinite() && it > 0 && it <= 300) { "Height must be greater than 0 and at most 300 cm." } }
+        bone_mass_kg?.let { require(it.isFinite() && it > 0 && it <= 100) { "Bone mass must be greater than 0 and at most 100 kg." } }
+        body_water_mass_kg?.let { require(it.isFinite() && it > 0 && it <= 500) { "Body water mass must be greater than 0 and at most 500 kg." } }
         parseTime(timestamp)
+        validateKey(idempotency_key)
+    }
+}
+
+val MINDFULNESS_TYPE_NAMES = setOf("meditation", "breathing", "music", "movement", "unguided", "other")
+
+@Serializable
+data class OxygenEntry(val percent: Double, val timestamp: String, val idempotency_key: String? = null) {
+    fun validate() {
+        require(percent.isFinite() && percent > 0 && percent <= 100) { "Oxygen saturation must be greater than 0 and at most 100 percent." }
+        parseTime(timestamp)
+        validateKey(idempotency_key)
+    }
+}
+
+@Serializable
+data class MindfulnessEntry(
+    val session_type: String, val start_time: String, val end_time: String,
+    val title: String? = null, val notes: String? = null, val idempotency_key: String? = null,
+) {
+    fun validate() {
+        require(session_type in MINDFULNESS_TYPE_NAMES) { "Unsupported session type." }
+        validateSpan(start_time, end_time)
+        title?.let { require(it.isNotBlank() && it.length <= 200) { "Title must contain 1-200 characters." } }
+        notes?.let { require(it.isNotBlank() && it.length <= 1000) { "Notes must contain 1-1000 characters." } }
         validateKey(idempotency_key)
     }
 }
@@ -116,6 +177,7 @@ data class NutritionData(
     val calories_kcal: Double?, val protein_g: Double?, val carbs_g: Double?,
     val fat_g: Double?, val sugar_g: Double?, val fiber_g: Double?, val sodium_mg: Double?,
     val source_application: String,
+    val nutrients: Map<String, Double> = emptyMap(),
 )
 @Serializable
 data class WeightData(val id: String, val weight_kg: Double, val timestamp: String, val source_application: String)

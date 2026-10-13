@@ -29,6 +29,7 @@ export const OPERATIONS = [
   "update_nutrition", "add_nutrition_batch", "get_hydration", "add_hydration", "get_sleep", "add_sleep",
   "get_workouts", "add_workout", "get_heart_rate", "get_active_calories", "get_body_measurements",
   "add_body_measurement", "get_daily_summary", "get_data_freshness",
+  "get_oxygen_saturation", "add_oxygen_saturation", "get_vitals", "get_activity_detail", "get_mindfulness", "add_mindfulness",
 ] as const;
 export type Operation = (typeof OPERATIONS)[number];
 
@@ -70,7 +71,21 @@ export const EXERCISE_TYPES = [
   "elliptical", "stair_climbing", "stretching", "dancing", "calisthenics", "other",
 ] as const;
 export const MAX_BATCH = 20;
-const NUTRITION_FIELDS = ["meal_name", "meal_type", "timestamp", "calories_kcal", "protein_g", "carbs_g", "fat_g", "sugar_g", "fiber_g", "sodium_mg"];
+/** Optional detail nutrients, all >= 0; the unit is part of the key. */
+export const NUTRIENT_KEYS = [
+  "sugar_g", "fiber_g", "sodium_mg",
+  "saturated_fat_g", "unsaturated_fat_g", "monounsaturated_fat_g", "polyunsaturated_fat_g", "trans_fat_g", "cholesterol_mg",
+  "potassium_mg", "calcium_mg", "iron_mg", "magnesium_mg", "zinc_mg", "phosphorus_mg", "copper_mg", "manganese_mg", "chloride_mg",
+  "selenium_mcg", "chromium_mcg", "molybdenum_mcg", "iodine_mcg",
+  "vitamin_a_mcg", "vitamin_b6_mg", "vitamin_b12_mcg", "vitamin_c_mg", "vitamin_d_mcg", "vitamin_e_mg", "vitamin_k_mcg",
+  "thiamin_mg", "riboflavin_mg", "niacin_mg", "folate_mcg", "folic_acid_mcg", "biotin_mcg", "pantothenic_acid_mg", "caffeine_mg",
+] as const;
+export const MINDFULNESS_TYPES = ["meditation", "breathing", "music", "movement", "unguided", "other"] as const;
+const NUTRITION_FIELDS: string[] = ["meal_name", "meal_type", "timestamp", "calories_kcal", "protein_g", "carbs_g", "fat_g", ...NUTRIENT_KEYS];
+/** Body composition fields accepted by add_body_measurement, with their upper bounds. */
+const BODY_FIELDS: [string, number][] = [
+  ["body_fat_percent", 100], ["lean_body_mass_kg", 1000], ["height_cm", 300], ["bone_mass_kg", 100], ["body_water_mass_kg", 500],
+];
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 type Json = Record<string, unknown>;
@@ -100,7 +115,7 @@ function validateNutritionFields(args: Json): string | null {
   for (const key of ["calories_kcal", "protein_g", "carbs_g", "fat_g"]) {
     if (key in args && !measure(args[key], 0, 100_000)) return `${key} must be a finite number from 0 to 100000.`;
   }
-  for (const key of ["sugar_g", "fiber_g", "sodium_mg"]) {
+  for (const key of NUTRIENT_KEYS) {
     if (args[key] !== undefined && args[key] !== null && !measure(args[key], 0, 100_000)) return `${key} must be 0-100000.`;
   }
   return null;
@@ -108,7 +123,7 @@ function validateNutritionFields(args: Json): string | null {
 
 function validateNutritionEntry(args: Json): string | null {
   const required = ["meal_name", "meal_type", "timestamp", "calories_kcal", "protein_g", "carbs_g", "fat_g", "idempotency_key"];
-  if (!exactKeys(args, required, ["sugar_g", "fiber_g", "sodium_mg"])) return "Unexpected or missing nutrition fields.";
+  if (!exactKeys(args, required, [...NUTRIENT_KEYS])) return "Unexpected or missing nutrition fields.";
   const invalid = validateNutritionFields(args);
   if (invalid) return invalid;
   return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
@@ -138,7 +153,11 @@ export function validateArguments(op: Operation, args: unknown): string | null {
     case "get_workouts":
     case "get_heart_rate":
     case "get_active_calories":
-    case "get_body_measurements": {
+    case "get_body_measurements":
+    case "get_oxygen_saturation":
+    case "get_vitals":
+    case "get_activity_detail":
+    case "get_mindfulness": {
       if (!exactKeys(args, ["start_time", "end_time"])) return "Provide exactly start_time and end_time.";
       if (!timestamp(args.start_time) || !timestamp(args.end_time)) return "Use ISO 8601 timestamps with an explicit UTC offset.";
       const start = Date.parse(args.start_time as string);
@@ -194,13 +213,31 @@ export function validateArguments(op: Operation, args: unknown): string | null {
       return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
     }
     case "add_body_measurement": {
-      if (!exactKeys(args, ["timestamp", "idempotency_key"], ["body_fat_percent", "lean_body_mass_kg"])) return "Unexpected or missing body measurement fields.";
+      if (!exactKeys(args, ["timestamp", "idempotency_key"], [...BODY_FIELDS.map(([key]) => key)])) return "Unexpected or missing body measurement fields.";
       if (!timestamp(args.timestamp)) return "Use an ISO 8601 timestamp with an explicit UTC offset.";
-      const fat = args.body_fat_percent ?? null;
-      const lean = args.lean_body_mass_kg ?? null;
-      if (fat === null && lean === null) return "Provide body_fat_percent or lean_body_mass_kg.";
-      if (fat !== null && !measure(fat, 0, 100, true)) return "body_fat_percent must be greater than 0 and at most 100.";
-      if (lean !== null && !measure(lean, 0, 1000, true)) return "lean_body_mass_kg must be greater than 0 and at most 1000.";
+      let any = false;
+      for (const [key, max] of BODY_FIELDS) {
+        const value = args[key] ?? null;
+        if (value === null) continue;
+        any = true;
+        if (!measure(value, 0, max, true)) return `${key} must be greater than 0 and at most ${max}.`;
+      }
+      if (!any) return `Provide at least one of ${BODY_FIELDS.map(([key]) => key).join(", ")}.`;
+      return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
+    }
+    case "add_oxygen_saturation": {
+      if (!exactKeys(args, ["percent", "timestamp", "idempotency_key"])) return "Provide exactly percent, timestamp and idempotency_key.";
+      if (!measure(args.percent, 0, 100, true)) return "percent must be greater than 0 and at most 100.";
+      if (!timestamp(args.timestamp)) return "Use an ISO 8601 timestamp with an explicit UTC offset.";
+      return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
+    }
+    case "add_mindfulness": {
+      if (!exactKeys(args, ["session_type", "start_time", "end_time", "idempotency_key"], ["title", "notes"])) return "Unexpected or missing mindfulness fields.";
+      if (typeof args.session_type !== "string" || !(MINDFULNESS_TYPES as readonly string[]).includes(args.session_type)) return "Unsupported session_type.";
+      const span = validateSpan(args);
+      if (span) return span;
+      if (args.title !== undefined && args.title !== null && !text(args.title, 200)) return "title must contain 1-200 characters.";
+      if (args.notes !== undefined && args.notes !== null && !text(args.notes, 1000)) return "notes must contain 1-1000 characters.";
       return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
     }
     case "get_daily_summary": {
