@@ -73,7 +73,7 @@ fun BridgeUi(model: UiModel, permissions: () -> Unit, manageHealth: () -> Unit, 
                         }
                         if (addingMeal) MealComposer(app, ui.busy, model::run, sharedText)
                         NavigationRow("Health permissions",
-                            if (app.health.available()) "${ui.granted} of 5 permissions enabled" else "Health Connect unavailable", permissions)
+                            if (app.health.available()) "${ui.granted} of ${dev.healthbridge.health.HealthConnectManager.permissions.size} permissions enabled" else "Health Connect unavailable", permissions)
                         GatewayPanel(relay, settings.paired, clients.count { it.enabled && it.verifier != null }, ui.busy, start, stop)
                         NavigationRow("Application access", "${clients.size} registered applications") { screen = 1 }
                         Text("Recent activity", style = MaterialTheme.typography.titleMedium)
