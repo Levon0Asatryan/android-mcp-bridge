@@ -31,7 +31,7 @@ class UiModel(application: Application) : AndroidViewModel(application) {
                 mutable.update { it.copy(error = when (e) {
                     is dev.healthbridge.relay.RelayException -> e.message ?: "The instance request failed."
                     is SecurityException -> "Health permission is missing or revoked. Open system health permissions."
-                    is IllegalArgumentException -> "Invalid input. Check the JSON fields, timestamps and measurements."
+                    is IllegalArgumentException -> e.message?.takeIf { it.isNotBlank() } ?: "Invalid input. Check the JSON fields, timestamps and measurements."
                     else -> "Operation failed (${e.javaClass.simpleName}). A successful write is not being claimed. Retry uncertain writes only with the same request."
                 }) }
             } finally { mutable.update { it.copy(busy = false) } }
