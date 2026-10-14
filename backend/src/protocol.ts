@@ -30,11 +30,11 @@ export const OPERATIONS = [
   "get_workouts", "add_workout", "get_heart_rate", "get_active_calories", "get_body_measurements",
   "add_body_measurement", "get_daily_summary", "get_data_freshness",
   "get_oxygen_saturation", "add_oxygen_saturation", "get_vitals", "get_activity_detail", "get_mindfulness", "add_mindfulness",
-  "set_alarm", "dismiss_alarm", "get_next_alarm", "show_alarms", "set_timer", "send_notification", "speak", "run_shell", "get_developer_status",
+  "set_alarm", "dismiss_alarm", "get_next_alarm", "show_alarms", "set_timer", "send_notification", "speak",
 ] as const;
 export type Operation = (typeof OPERATIONS)[number];
 
-const ACTION_OPERATIONS: readonly string[] = ["set_alarm", "dismiss_alarm", "show_alarms", "set_timer", "send_notification", "speak", "run_shell"];
+const ACTION_OPERATIONS: readonly string[] = ["set_alarm", "dismiss_alarm", "show_alarms", "set_timer", "send_notification", "speak"];
 export const isWrite = (op: Operation) => op.startsWith("add_") || op.startsWith("update_") || ACTION_OPERATIONS.includes(op);
 export const isDelete = (op: Operation) => op.startsWith("delete_");
 
@@ -148,7 +148,6 @@ export function validateArguments(op: Operation, args: unknown): string | null {
     case "get_permissions":
     case "get_next_alarm":
     case "show_alarms":
-    case "get_developer_status":
     case "get_data_freshness":
       return Object.keys(args).length === 0 ? null : "No arguments are accepted.";
     case "get_nutrition":
@@ -306,12 +305,6 @@ export function validateArguments(op: Operation, args: unknown): string | null {
       if (!text(args.message, 500)) return "message must contain 1-500 characters.";
       if (args.priority !== undefined && args.priority !== "normal" && args.priority !== "high") return "priority must be normal or high.";
       return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
-    }
-    case "run_shell": {
-      if (!exactKeys(args, ["command"], ["timeout_seconds"])) return "Provide command and optionally timeout_seconds.";
-      if (!text(args.command, 2000)) return "command must contain 1-2000 characters.";
-      if (args.timeout_seconds !== undefined && !(Number.isInteger(args.timeout_seconds) && (args.timeout_seconds as number) >= 1 && (args.timeout_seconds as number) <= 60)) return "timeout_seconds must be an integer from 1 to 60.";
-      return null;
     }
     case "speak": {
       if (!exactKeys(args, ["message", "idempotency_key"])) return "Provide exactly message and idempotency_key.";

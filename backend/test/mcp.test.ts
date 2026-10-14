@@ -139,7 +139,6 @@ describe("MCP endpoint", () => {
         "update_hydration", "update_nutrition"].map((name) => `health_${name}`),
       ...["dismiss_alarm", "get_next_alarm", "set_alarm", "set_timer", "show_alarms"].map((name) => `clock_${name}`),
       ...["send_notification", "speak"].map((name) => `notify_${name}`),
-      ...["run_shell", "status"].map((name) => `dev_${name}`),
     ].sort());
     const del = tools.find((t) => t.name === "health_delete_weight");
     expect(del?.annotations).toMatchObject({ destructiveHint: true, readOnlyHint: false });

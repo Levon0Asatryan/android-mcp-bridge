@@ -232,14 +232,7 @@ the new scopes are requested and approved on the phone.
 
 - No waist circumference (not in Health Connect 1.1.0).
 - New tools are MCP-only; the legacy Actions API is unchanged.
-- Delete exists for nutrition, weight and hydration (update also for hydration); none for sleep, workouts or body measurements.
+- No delete for hydration, sleep, workouts or body measurements.
 - Samsung Health write visibility is reported as `not_verified`.
 - Mobile ChatGPT support for custom MCP tools is unconfirmed.
 - Extended reads and writes have not been run against a real phone yet.
-
-## Developer access (shell)
-
-- `dev_run_shell` and `dev_status` (scope `dev.shell`) run commands through the phone's own Wireless debugging daemon (libadb-android 3.1.1 from JitPack, pinned and restricted to its group).
-- Locked by default. The owner unlocks it in Settings > Developer access with biometric or device credential; it expires after 10 minutes and can be locked early. A locked call returns `approval_required` and posts a notification.
-- Every command is recorded in the phone's security events (first 200 characters). Output is capped at 30,000 characters; timeout 1-60 s.
-- One-time pairing needs the Wireless debugging pairing port and code. Not yet tested on a real phone.

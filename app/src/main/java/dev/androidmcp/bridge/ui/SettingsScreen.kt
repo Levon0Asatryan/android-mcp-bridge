@@ -24,7 +24,6 @@ fun SettingsScreen(app: BridgeApplication, settings: Settings, relay: RelayState
         NavigationRow("Security alerts", "Device sessions, first use and rejected credentials") { page = "security" }
         NavigationRow("Health Connect", "Permissions and read/write checks") { page = "health" }
         NavigationRow("Alarms, notifications and speech", "Clock, notify and speak access") { page = "device" }
-        NavigationRow("Developer access", "Shell access for AI, biometric unlock for 10 minutes") { page = "developer" }
         NavigationRow("Samsung Health", "Synchronization setup guide") { page = "samsung" }
         NavigationRow("Connection", "Manual start only") { page = "gateway" }
         NavigationRow("Appearance", settings.theme) { page = "theme" }
@@ -60,7 +59,6 @@ fun SettingsScreen(app: BridgeApplication, settings: Settings, relay: RelayState
                     Text("Speech uses the media volume and is refused when it is muted. Android shows only the next alarm to apps.")
                 }
             }
-            "developer" -> DeveloperPanel(app, busy, run)
             "samsung" -> Panel("Samsung Health") {
                 Text("Open Samsung Health, then Settings and Health Connect. Enable synchronization for the data you want to use.")
                 Text("Return here and grant Android MCP Bridge read/write permissions. Create a test entry, then check Samsung Health separately.")

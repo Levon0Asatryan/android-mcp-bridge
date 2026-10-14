@@ -35,7 +35,6 @@ export const MODULES = {
   core: { title: "Bridge", description: "Connection and permission status." },
   health: { title: "Health", description: "Health Connect data: nutrition, body, activity, sleep, vitals, mindfulness." },
   clock: { title: "Clock", description: "Alarms and timers in the phone's Clock app." },
-  dev: { title: "Developer", description: "Shell access to the phone, unlocked by the owner with biometrics for 10 minutes at a time." },
   notify: { title: "Notify", description: "Notifications and spoken messages on the phone." },
 } as const;
 export type ModuleName = keyof typeof MODULES;
@@ -151,11 +150,6 @@ const TOOLS: Record<string, ToolSpec> = {
   speak: { module: "notify", operation: "speak", title: "Speak aloud", readOnly: false, destructive: false, idempotent: true,
     description: "Read a message aloud on the phone speaker (text to speech, up to 500 characters). Fails if the media volume is muted. Retrying with the same idempotency_key does not repeat it.",
     input: z.object({ message: z.string().min(1).max(500), idempotency_key: idempotency }).strict() },
-  run_shell: { module: "dev", operation: "run_shell", title: "Run shell command", readOnly: false, destructive: true, idempotent: false,
-    description: "Run a shell command on the phone with adb-shell privileges (input tap/text/swipe, screencap, am/pm/cmd, dumpsys, settings, logcat -d ...). Works only while the owner has unlocked developer access on the phone with biometrics (10-minute window); otherwise returns approval_required and the owner is notified. Output is capped; commands time out after timeout_seconds (default 20, max 60). Use sparingly and state what you are doing.",
-    input: z.object({ command: z.string().min(1).max(2000), timeout_seconds: z.number().int().min(1).max(60).optional() }).strict() },
-  status: { module: "dev", operation: "get_developer_status", title: "Developer access status", readOnly: true, destructive: false, idempotent: true, input: empty,
-    description: "Whether developer access is currently unlocked on the phone, how many seconds remain, and whether the debug daemon is connected." },
   get_daily_summary: { operation: "get_daily_summary", title: "Daily health summary", readOnly: true, destructive: false, idempotent: true,
     description: "One-call summary of a calendar day in the phone's time zone: nutrition (totals per source), hydration, steps, workouts, sleep, weight, body measurements, active calories and heart rate. Sections the connection may not read are reported as not_permitted. Today is summarised up to now.",
     input: z.object({ date: z.string().length(10).describe("Calendar date, YYYY-MM-DD, in the phone's time zone.") }).strict() },
