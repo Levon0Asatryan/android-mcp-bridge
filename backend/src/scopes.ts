@@ -7,7 +7,7 @@ export const SCOPES = [
   "health.hydration.read", "health.hydration.write", "health.hydration.delete", "health.sleep.read", "health.sleep.write", "health.workouts.read", "health.workouts.write",
   "health.heart_rate.read", "health.active_calories.read", "health.body.read", "health.body.write", "health.summary.read",
   "health.oxygen.read", "health.oxygen.write", "health.vitals.read", "health.activity.read", "health.mindfulness.read", "health.mindfulness.write",
-  "clock.alarm.read", "clock.alarm.set", "clock.alarm.dismiss", "clock.timer.set", "notify.send", "notify.speak",
+  "clock.alarm.read", "clock.alarm.set", "clock.alarm.dismiss", "clock.timer.set", "notify.send", "notify.speak", "dev.shell",
 ] as const;
 export type Scope = (typeof SCOPES)[number];
 
@@ -27,6 +27,7 @@ export const SCOPE_FOR: Record<Operation, Scope> = {
   get_activity_detail: "health.activity.read", get_mindfulness: "health.mindfulness.read", add_mindfulness: "health.mindfulness.write",
   get_next_alarm: "clock.alarm.read", show_alarms: "clock.alarm.read", set_alarm: "clock.alarm.set", dismiss_alarm: "clock.alarm.dismiss",
   set_timer: "clock.timer.set", send_notification: "notify.send", speak: "notify.speak",
+  run_shell: "dev.shell", get_developer_status: "dev.shell",
 };
 
 export const isScope = (value: unknown): value is Scope => typeof value === "string" && (SCOPES as readonly string[]).includes(value);

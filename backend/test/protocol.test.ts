@@ -43,6 +43,11 @@ describe("protocol policy", () => {
     expect(validateArguments("update_hydration", { record_id: "r", changes: {} })).not.toBeNull();
     expect(validateArguments("update_hydration", { record_id: "r", changes: { volume_ml: 0 } })).not.toBeNull();
     expect(validateArguments("update_hydration", { record_id: "r", changes: { calories: 1 } })).not.toBeNull();
+    expect(validateArguments("run_shell", { command: "input keyevent 3" })).toBeNull();
+    expect(validateArguments("run_shell", { command: "ls", timeout_seconds: 61 })).not.toBeNull();
+    expect(validateArguments("run_shell", { command: "" })).not.toBeNull();
+    expect(validateArguments("run_shell", { command: "ls", extra: 1 })).not.toBeNull();
+    expect(validateArguments("get_developer_status", {})).toBeNull();
     expect(validateArguments("delete_hydration", { record_id: "r" })).toBeNull();
   });
 

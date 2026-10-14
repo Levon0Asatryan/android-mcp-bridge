@@ -17,6 +17,7 @@ import android.content.pm.PackageManager
 import android.util.Log
 import dev.androidmcp.bridge.api.HealthActions
 import dev.androidmcp.bridge.device.*
+import dev.androidmcp.bridge.dev.*
 import dev.androidmcp.bridge.relay.DeviceConditions
 import dev.androidmcp.bridge.relay.KeystoreDeviceIdentity
 import dev.androidmcp.bridge.relay.RelayException
@@ -65,6 +66,10 @@ class BridgeApplication : Application() {
     val audit by lazy { AuditLogger(database.dao(), settings) }
     val phoneApproval = PhoneApproval()
     private val visibility = VisibilityTracker()
+    val developer = DeveloperSession()
+    val adbShell by lazy { AdbShell(this) }
+    /** Set by the visible activity so settings screens can ask for biometric or device-credential confirmation. */
+    var authenticator: ((String, String, (Boolean) -> Unit) -> Unit)? = null
     fun phoneUnlocked(): Boolean {
         val keyguard = getSystemService(KeyguardManager::class.java)
         return keyguard.isDeviceSecure && !keyguard.isDeviceLocked
@@ -74,6 +79,9 @@ class BridgeApplication : Application() {
         val deviceModules = listOf(
             ClockModule(AndroidClock(this, visibility::visible)),
             NotifyModule(AndroidNotifier(this), AndroidSpeaker(this)),
+            DeveloperModule(developer, adbShell,
+                onLocked = { securityAlert("An AI client asked for developer shell access. Open Settings > Developer access to unlock it for 10 minutes.") },
+                onCommand = { recordLocalEvent("developer_shell", it.take(200)) }),
         )
         val actions = HealthActions(health, clients, audit, phoneApproval, ::phoneUnlocked, ::powerSaving, deviceModules) {
             relay.state.value is dev.androidmcp.bridge.relay.RelayState.Connected

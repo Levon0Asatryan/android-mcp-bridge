@@ -24,7 +24,8 @@ enum class ClientPermission(val label: String, val scope: String) {
     MINDFULNESS_READ("Mindfulness read", "health.mindfulness.read"), MINDFULNESS_WRITE("Mindfulness write", "health.mindfulness.write"),
     CLOCK_ALARM_READ("Alarms: see next, open list", "clock.alarm.read"), CLOCK_ALARM_SET("Alarms: set", "clock.alarm.set"),
     CLOCK_ALARM_DISMISS("Alarms: dismiss", "clock.alarm.dismiss"), CLOCK_TIMER_SET("Timers: start", "clock.timer.set"),
-    NOTIFY_SEND("Notifications: show on phone", "notify.send"), NOTIFY_SPEAK("Speak aloud on phone", "notify.speak")
+    NOTIFY_SEND("Notifications: show on phone", "notify.send"), NOTIFY_SPEAK("Speak aloud on phone", "notify.speak"),
+    DEV_SHELL("Developer shell (needs biometric unlock)", "dev.shell")
 }
 /** OAuth scope for status and permission checks; carries no health data. */
 const val STATUS_SCOPE = "bridge.status"

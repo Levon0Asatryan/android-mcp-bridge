@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         model = ViewModelProvider(this)[UiModel::class.java]
+        model.app.authenticator = ::authenticate
         if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
             intent.getStringExtra(Intent.EXTRA_TEXT)?.let(model::acceptSharedText)
         }
@@ -133,6 +134,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (model.app.authenticator != null) model.app.authenticator = null
         biometricCancellation?.cancel()
         pendingCredential?.invoke(false)
         pendingCredential = null
