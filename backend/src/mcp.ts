@@ -76,6 +76,13 @@ const TOOLS: Record<string, ToolSpec> = {
   add_hydration: { operation: "add_hydration", title: "Add water intake", readOnly: false, destructive: false, idempotent: true,
     description: "Log water intake in millilitres. Retrying with the same idempotency_key does not create a duplicate.",
     input: z.object({ volume_ml: z.number().finite().gt(0).max(10_000), timestamp: isoTime, idempotency_key: idempotency }).strict() },
+  update_hydration: { operation: "update_hydration", title: "Update water intake", readOnly: false, destructive: false, idempotent: true,
+    description: "Correct a water entry previously added by Android MCP Bridge, in place and without creating a duplicate. Send only the fields to change: volume_ml and/or timestamp. Entries from other apps cannot be changed.",
+    input: z.object({ record_id: z.string().min(1).max(200).describe("Exact id of a Android MCP Bridge hydration record."),
+      changes: z.object({ volume_ml: z.number().finite().gt(0).max(10_000).optional(), timestamp: isoTime.optional() }).strict()
+        .refine((c) => Object.keys(c).length > 0, "Provide at least one change.") }).strict() },
+  delete_hydration: { operation: "delete_hydration", title: "Delete water intake", readOnly: false, destructive: true, idempotent: false, input: recordId,
+    description: "Delete one water record written by Android MCP Bridge. The owner must confirm on the phone." },
   get_sleep: { operation: "get_sleep", title: "Read sleep", readOnly: true, destructive: false, idempotent: true, input: range,
     description: "Read sleep sessions with duration and stage totals (when the source provides stages) between start_time and end_time (at most 366 days)." },
   add_sleep: { operation: "add_sleep", title: "Add sleep session", readOnly: false, destructive: false, idempotent: true,

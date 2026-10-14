@@ -248,6 +248,36 @@ class HealthConnectManager(private val context: Context) : HealthRepository {
         return WriteResult(record_id = client.insertRecords(listOf(record)).recordIdsList.single(), timestamp = entry.timestamp)
     }
 
+    override suspend fun updateHydration(id: String, changes: HydrationChanges): WriteResult {
+        require(id.isNotBlank() && id.length <= 200) { "Invalid record ID." }
+        changes.validate()
+        check(HealthPermission.getReadPermission(HydrationRecord::class))
+        check(HealthPermission.getWritePermission(HydrationRecord::class))
+        checkHealthOperation()
+        val old = client.readRecord(HydrationRecord::class, id).record
+        require(old.metadata.dataOrigin.packageName == context.packageName) { "Only Android MCP Bridge-owned records can be updated." }
+        val key = old.metadata.clientRecordId
+        require(key != null) { "This record cannot be updated in place." }
+        val oldOffset = old.startZoneOffset ?: ZoneId.systemDefault().rules.getOffset(old.startTime)
+        val time = changes.timestamp?.let { parseTime(it) } ?: old.startTime.atOffset(oldOffset)
+        val volume = changes.volume_ml ?: old.volume.inMilliliters
+        val record = HydrationRecord(time.toInstant(), time.offset, time.toInstant().plusSeconds(1), time.offset,
+            Volume.milliliters(volume), Metadata.manualEntry(clientRecordId = key, clientRecordVersion = old.metadata.clientRecordVersion + 1))
+        checkHealthOperation()
+        return WriteResult(record_id = client.insertRecords(listOf(record)).recordIdsList.single(), timestamp = time.toString())
+    }
+
+    override suspend fun deleteHydration(id: String) {
+        require(id.isNotBlank() && id.length <= 200) { "Invalid record ID." }
+        check(HealthPermission.getReadPermission(HydrationRecord::class))
+        check(HealthPermission.getWritePermission(HydrationRecord::class))
+        checkHealthOperation()
+        val record = client.readRecord(HydrationRecord::class, id).record
+        require(record.metadata.dataOrigin.packageName == context.packageName) { "Only Android MCP Bridge-owned records can be deleted." }
+        checkHealthOperation()
+        client.deleteRecords(HydrationRecord::class, listOf(id), emptyList())
+    }
+
     override suspend fun sleep(start: String, end: String): JsonObject {
         check(HealthPermission.getReadPermission(SleepSessionRecord::class))
         val (from, to) = dateRange(start, end)

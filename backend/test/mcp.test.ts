@@ -133,10 +133,10 @@ describe("MCP endpoint", () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       "bridge_connection_check", "bridge_permissions", "bridge_status",
       ...["add_body_measurement", "add_hydration", "add_mindfulness", "add_nutrition", "add_nutrition_batch", "add_oxygen_saturation",
-        "add_sleep", "add_weight", "add_workout", "delete_nutrition", "delete_weight", "get_active_calories", "get_activity_detail",
+        "add_sleep", "add_weight", "add_workout", "delete_hydration", "delete_nutrition", "delete_weight", "get_active_calories", "get_activity_detail",
         "get_body_measurements", "get_daily_summary", "get_data_freshness", "get_heart_rate", "get_hydration", "get_mindfulness",
         "get_nutrition", "get_oxygen_saturation", "get_sleep", "get_steps", "get_vitals", "get_weight", "get_workouts",
-        "update_nutrition"].map((name) => `health_${name}`),
+        "update_hydration", "update_nutrition"].map((name) => `health_${name}`),
       ...["dismiss_alarm", "get_next_alarm", "set_alarm", "set_timer", "show_alarms"].map((name) => `clock_${name}`),
       ...["send_notification", "speak"].map((name) => `notify_${name}`),
     ].sort());

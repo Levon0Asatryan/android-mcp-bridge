@@ -4,7 +4,7 @@ import type { Operation } from "./protocol";
 export const SCOPES = [
   "bridge.status", "health.nutrition.read", "health.nutrition.write", "health.nutrition.delete",
   "health.weight.read", "health.weight.write", "health.weight.delete", "health.steps.read",
-  "health.hydration.read", "health.hydration.write", "health.sleep.read", "health.sleep.write", "health.workouts.read", "health.workouts.write",
+  "health.hydration.read", "health.hydration.write", "health.hydration.delete", "health.sleep.read", "health.sleep.write", "health.workouts.read", "health.workouts.write",
   "health.heart_rate.read", "health.active_calories.read", "health.body.read", "health.body.write", "health.summary.read",
   "health.oxygen.read", "health.oxygen.write", "health.vitals.read", "health.activity.read", "health.mindfulness.read", "health.mindfulness.write",
   "clock.alarm.read", "clock.alarm.set", "clock.alarm.dismiss", "clock.timer.set", "notify.send", "notify.speak",
@@ -17,6 +17,7 @@ export const SCOPE_FOR: Record<Operation, Scope> = {
   get_weight: "health.weight.read", add_weight: "health.weight.write", delete_weight: "health.weight.delete", get_steps: "health.steps.read",
   update_nutrition: "health.nutrition.write", add_nutrition_batch: "health.nutrition.write",
   get_hydration: "health.hydration.read", add_hydration: "health.hydration.write",
+  update_hydration: "health.hydration.write", delete_hydration: "health.hydration.delete",
   get_sleep: "health.sleep.read", add_sleep: "health.sleep.write",
   get_workouts: "health.workouts.read", add_workout: "health.workouts.write",
   get_heart_rate: "health.heart_rate.read", get_active_calories: "health.active_calories.read",

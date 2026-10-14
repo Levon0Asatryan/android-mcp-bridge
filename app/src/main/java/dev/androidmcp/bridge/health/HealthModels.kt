@@ -103,6 +103,16 @@ data class HydrationEntry(val volume_ml: Double, val timestamp: String, val idem
 }
 
 @Serializable
+data class HydrationChanges(val volume_ml: Double? = null, val timestamp: String? = null) {
+    fun isEmpty() = volume_ml == null && timestamp == null
+    fun validate() {
+        require(!isEmpty()) { "Provide at least one change." }
+        volume_ml?.let { require(it.isFinite() && it > 0 && it <= 10_000) { "Volume must be greater than 0 and at most 10000 ml." } }
+        timestamp?.let { parseTime(it) }
+    }
+}
+
+@Serializable
 data class SleepEntry(val start_time: String, val end_time: String, val title: String? = null, val idempotency_key: String? = null) {
     fun validate() {
         validateSpan(start_time, end_time)

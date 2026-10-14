@@ -39,6 +39,11 @@ describe("protocol policy", () => {
     expect(validateArguments("get_steps", { start_time: "2030-01-02T00:00:00Z", end_time: "2030-01-01T00:00:00Z" })).not.toBeNull();
     expect(validateArguments("get_steps", { start_time: "2028-01-01T00:00:00Z", end_time: "2030-01-01T00:00:00Z" })).not.toBeNull();
     expect(validateArguments("delete_weight", { record_id: "r".repeat(201) })).not.toBeNull();
+    expect(validateArguments("update_hydration", { record_id: "r", changes: { volume_ml: 300 } })).toBeNull();
+    expect(validateArguments("update_hydration", { record_id: "r", changes: {} })).not.toBeNull();
+    expect(validateArguments("update_hydration", { record_id: "r", changes: { volume_ml: 0 } })).not.toBeNull();
+    expect(validateArguments("update_hydration", { record_id: "r", changes: { calories: 1 } })).not.toBeNull();
+    expect(validateArguments("delete_hydration", { record_id: "r" })).toBeNull();
   });
 
   it("maps only the fixed Actions routes", () => {

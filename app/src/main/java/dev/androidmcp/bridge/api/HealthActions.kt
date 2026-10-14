@@ -210,6 +210,15 @@ class HealthActions(
                     nativeWrite { health.addHydration(entry, it) }
                 }, bridgeJson.encodeToJsonElement(entry.copy(idempotency_key = null)))
             }
+            "update_hydration" -> {
+                require(args.keys == setOf("record_id", "changes"))
+                val id = args.getValue("record_id").jsonPrimitive.also { require(it.isString) }.content
+                require(id.isNotBlank() && id.length <= 200)
+                val changes = bridgeJson.decodeFromJsonElement<HydrationChanges>(args.getValue("changes").jsonObject).also { it.validate() }
+                checkLive(deadlineMillis)
+                val result = health.updateHydration(id, changes)
+                JsonObject(bridgeJson.encodeToJsonElement(result).jsonObject + ("updated_fields" to bridgeJson.encodeToJsonElement(changes)))
+            }
             "add_sleep" -> {
                 val entry = bridgeJson.decodeFromJsonElement<SleepEntry>(args).also { it.validate() }
                 writeResult(clients.writeOnce(client, operation, entry.idempotency_key,
@@ -266,10 +275,14 @@ class HealthActions(
                 require(args.isEmpty())
                 health.freshness(freshnessTypes.filterValues { clients.permits(client, auth, it) }.keys)
             }
-            "delete_nutrition", "delete_weight" -> {
+            "delete_nutrition", "delete_weight", "delete_hydration" -> {
                 require(args.keys == setOf("record_id"))
                 val id = args.getValue("record_id").jsonPrimitive.also { require(it.isString) }.content
-                if (operation == "delete_nutrition") health.deleteNutrition(id) else health.deleteWeight(id)
+                when (operation) {
+                    "delete_nutrition" -> health.deleteNutrition(id)
+                    "delete_weight" -> health.deleteWeight(id)
+                    else -> health.deleteHydration(id)
+                }
                 obj("success" to JsonPrimitive(true), "deleted_record_id" to text(id),
                     "samsung_health_visibility" to text("not_verified"))
             }
@@ -415,6 +428,7 @@ class HealthActions(
             "delete_weight" to ClientPermission.WEIGHT_DELETE,
             "update_nutrition" to ClientPermission.NUTRITION_WRITE, "add_nutrition_batch" to ClientPermission.NUTRITION_WRITE,
             "get_hydration" to ClientPermission.HYDRATION_READ, "add_hydration" to ClientPermission.HYDRATION_WRITE,
+            "update_hydration" to ClientPermission.HYDRATION_WRITE, "delete_hydration" to ClientPermission.HYDRATION_DELETE,
             "get_sleep" to ClientPermission.SLEEP_READ, "add_sleep" to ClientPermission.SLEEP_WRITE,
             "get_workouts" to ClientPermission.WORKOUTS_READ, "add_workout" to ClientPermission.WORKOUTS_WRITE,
             "get_heart_rate" to ClientPermission.HEART_RATE_READ, "get_active_calories" to ClientPermission.ACTIVE_CALORIES_READ,
@@ -440,6 +454,7 @@ class HealthActions(
             "delete_weight" to setOf(HC + "WRITE_WEIGHT"),
             "get_steps" to setOf(HC + "READ_STEPS"),
             "get_hydration" to setOf(HC + "READ_HYDRATION"), "add_hydration" to setOf(HC + "WRITE_HYDRATION"),
+            "update_hydration" to setOf(HC + "READ_HYDRATION", HC + "WRITE_HYDRATION"), "delete_hydration" to setOf(HC + "READ_HYDRATION", HC + "WRITE_HYDRATION"),
             "get_sleep" to setOf(HC + "READ_SLEEP"), "add_sleep" to setOf(HC + "WRITE_SLEEP"),
             "get_workouts" to setOf(HC + "READ_EXERCISE"), "add_workout" to setOf(HC + "WRITE_EXERCISE"),
             "get_heart_rate" to setOf(HC + "READ_HEART_RATE"),

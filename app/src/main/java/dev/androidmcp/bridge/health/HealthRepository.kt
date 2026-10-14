@@ -18,6 +18,8 @@ interface HealthRepository {
     suspend fun stepSources(start: String, end: String): List<String> = emptyList()
     suspend fun hydration(start: String, end: String): JsonObject = unsupported()
     suspend fun addHydration(entry: HydrationEntry, recordKey: String): WriteResult = unsupported()
+    suspend fun updateHydration(id: String, changes: HydrationChanges): WriteResult = unsupported()
+    suspend fun deleteHydration(id: String) { unsupported() }
     suspend fun sleep(start: String, end: String): JsonObject = unsupported()
     suspend fun addSleep(entry: SleepEntry, recordKey: String): WriteResult = unsupported()
     suspend fun workouts(start: String, end: String): JsonObject = unsupported()

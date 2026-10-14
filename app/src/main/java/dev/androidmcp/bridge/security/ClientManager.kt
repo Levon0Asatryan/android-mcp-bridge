@@ -13,7 +13,7 @@ enum class ClientPermission(val label: String, val scope: String) {
     NUTRITION_READ("Nutrition read", "health.nutrition.read"), NUTRITION_WRITE("Nutrition write", "health.nutrition.write"),
     WEIGHT_READ("Weight read", "health.weight.read"), WEIGHT_WRITE("Weight write", "health.weight.write"), STEPS_READ("Steps read", "health.steps.read"),
     NUTRITION_DELETE("Delete own nutrition", "health.nutrition.delete"), WEIGHT_DELETE("Delete own weight", "health.weight.delete"),
-    HYDRATION_READ("Water read", "health.hydration.read"), HYDRATION_WRITE("Water write", "health.hydration.write"),
+    HYDRATION_READ("Water read", "health.hydration.read"), HYDRATION_WRITE("Water write", "health.hydration.write"), HYDRATION_DELETE("Delete own water", "health.hydration.delete"),
     SLEEP_READ("Sleep read", "health.sleep.read"), SLEEP_WRITE("Sleep write", "health.sleep.write"),
     WORKOUTS_READ("Workouts read", "health.workouts.read"), WORKOUTS_WRITE("Workouts write", "health.workouts.write"),
     HEART_RATE_READ("Heart rate read", "health.heart_rate.read"), ACTIVE_CALORIES_READ("Active calories read", "health.active_calories.read"),

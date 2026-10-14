@@ -26,7 +26,7 @@ export const LIMITS = {
 export const OPERATIONS = [
   "get_gateway_status", "get_permissions", "get_nutrition", "get_weight", "get_steps",
   "add_nutrition", "add_weight", "delete_nutrition", "delete_weight",
-  "update_nutrition", "add_nutrition_batch", "get_hydration", "add_hydration", "get_sleep", "add_sleep",
+  "update_nutrition", "add_nutrition_batch", "get_hydration", "add_hydration", "update_hydration", "delete_hydration", "get_sleep", "add_sleep",
   "get_workouts", "add_workout", "get_heart_rate", "get_active_calories", "get_body_measurements",
   "add_body_measurement", "get_daily_summary", "get_data_freshness",
   "get_oxygen_saturation", "add_oxygen_saturation", "get_vitals", "get_activity_detail", "get_mindfulness", "add_mindfulness",
@@ -201,6 +201,16 @@ export function validateArguments(op: Operation, args: unknown): string | null {
       if (!timestamp(args.timestamp)) return "Use an ISO 8601 timestamp with an explicit UTC offset.";
       return text(args.idempotency_key, 128) ? null : "idempotency_key is required (1-128 characters).";
     }
+    case "update_hydration": {
+      if (!exactKeys(args, ["record_id", "changes"])) return "Provide exactly record_id and changes.";
+      if (!text(args.record_id, 200)) return "record_id must contain 1-200 characters.";
+      const changes = args.changes;
+      if (!isObject(changes) || Object.keys(changes).length === 0) return "changes must be an object with at least one field.";
+      if (!Object.keys(changes).every((key) => key === "volume_ml" || key === "timestamp")) return "changes may only contain volume_ml and timestamp.";
+      if (changes.volume_ml !== undefined && !measure(changes.volume_ml, 0, 10_000, true)) return "volume_ml must be greater than 0 and at most 10000.";
+      if (changes.timestamp !== undefined && !timestamp(changes.timestamp)) return "Use an ISO 8601 timestamp with an explicit UTC offset.";
+      return null;
+    }
     case "add_sleep": {
       if (!exactKeys(args, ["start_time", "end_time", "idempotency_key"], ["title"])) return "Unexpected or missing sleep fields.";
       const span = validateSpan(args);
@@ -303,6 +313,7 @@ export function validateArguments(op: Operation, args: unknown): string | null {
     }
     case "delete_nutrition":
     case "delete_weight":
+    case "delete_hydration":
       if (!exactKeys(args, ["record_id"])) return "Provide exactly record_id.";
       return text(args.record_id, 200) ? null : "record_id must contain 1-200 characters.";
   }
